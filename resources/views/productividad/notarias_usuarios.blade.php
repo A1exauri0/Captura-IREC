@@ -3,7 +3,6 @@
 <!-- CSS de DataTables -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css?v={{ time() }}" rel="stylesheet">
 
 <style>
     .badge {

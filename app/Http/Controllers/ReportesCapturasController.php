@@ -2795,5 +2795,108 @@ class ReportesCapturasController extends Controller
         $writer->save('php://output');
         exit;
     }
+
+    /**
+     * Bitácora e historial de auditoría para REGISTROS (auditoria_registros).
+     */
+    public function detalles_renombre_registros(Request $request)
+    {
+        $inicio = $request->input('inicio', date('Y-m-d', strtotime('-7 days')));
+        $fin = $request->input('fin', date('Y-m-d'));
+        $delegacionId = $request->input('delegacion_id');
+        $userId = $request->input('user_id');
+        $search = trim((string) $request->input('search', ''));
+
+        $query = DB::table('auditoria_registros as ar')
+            ->leftJoin('users as u', 'u.id', '=', 'ar.user_id')
+            ->leftJoin('delegaciones as d', 'd.id', '=', 'ar.delegacion_id')
+            ->select(
+                'ar.*',
+                'u.name as usuario_nombre',
+                'u.user as usuario_login',
+                'd.nombre as delegacion_nombre'
+            )
+            ->orderByDesc('ar.fecha_hora')
+            ->orderByDesc('ar.id');
+
+        if ($inicio) {
+            $query->where('ar.fecha_hora', '>=', $inicio . ' 00:00:00');
+        }
+        if ($fin) {
+            $query->where('ar.fecha_hora', '<=', $fin . ' 23:59:59');
+        }
+        if ($delegacionId) {
+            $query->where('ar.delegacion_id', $delegacionId);
+        }
+        if ($userId) {
+            $query->where('ar.user_id', $userId);
+        }
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('ar.archivo_original', 'like', "%{$search}%")
+                  ->orWhere('ar.archivo_nuevo', 'like', "%{$search}%")
+                  ->orWhere('ar.hash', 'like', "%{$search}%")
+                  ->orWhere('ar.accion', 'like', "%{$search}%");
+            });
+        }
+
+        $registros = $query->paginate(50)->withQueryString();
+        $delegaciones = DB::table('delegaciones')->orderBy('nombre')->get();
+        $usuarios = DB::table('users')->orderBy('name')->get(['id', 'name', 'user']);
+
+        return view('bitacora.historial_registros', compact(
+            'registros', 'delegaciones', 'usuarios', 'inicio', 'fin', 'delegacionId', 'userId', 'search'
+        ));
+    }
+
+    /**
+     * Bitácora e historial de auditoría para NOTARÍAS (auditoria_notarias).
+     */
+    public function detalles_renombre_notarias(Request $request)
+    {
+        $inicio = $request->input('inicio', date('Y-m-d', strtotime('-7 days')));
+        $fin = $request->input('fin', date('Y-m-d'));
+        $directorio = trim((string) $request->input('directorio', ''));
+        $userId = $request->input('user_id');
+        $search = trim((string) $request->input('search', ''));
+
+        $query = DB::table('auditoria_notarias as an')
+            ->leftJoin('users as u', 'u.id', '=', 'an.user_id')
+            ->select(
+                'an.*',
+                'u.name as usuario_nombre',
+                'u.user as usuario_login'
+            )
+            ->orderByDesc('an.fecha_hora')
+            ->orderByDesc('an.id');
+
+        if ($inicio) {
+            $query->where('an.fecha_hora', '>=', $inicio . ' 00:00:00');
+        }
+        if ($fin) {
+            $query->where('an.fecha_hora', '<=', $fin . ' 23:59:59');
+        }
+        if ($directorio !== '') {
+            $query->where('an.directorio', 'like', "%{$directorio}%");
+        }
+        if ($userId) {
+            $query->where('an.user_id', $userId);
+        }
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('an.archivo_original', 'like', "%{$search}%")
+                  ->orWhere('an.archivo_nuevo', 'like', "%{$search}%")
+                  ->orWhere('an.hash', 'like', "%{$search}%")
+                  ->orWhere('an.accion', 'like', "%{$search}%");
+            });
+        }
+
+        $registros = $query->paginate(50)->withQueryString();
+        $usuarios = DB::table('users')->orderBy('name')->get(['id', 'name', 'user']);
+
+        return view('bitacora.historial_notarias', compact(
+            'registros', 'usuarios', 'inicio', 'fin', 'directorio', 'userId', 'search'
+        ));
+    }
 }
 

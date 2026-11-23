@@ -16,10 +16,6 @@
     </div>
 
     <div class="d-flex align-items-center" style="gap: 12px;">
-        <!-- Indicador de estado WebSocket -->
-        <span id="ws-status-indicator" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 d-none d-md-inline-flex align-items-center">
-            <span class="inline-block w-2 h-2 rounded-full bg-sky-500 mr-1.5"></span>Tiempo Real
-        </span>
 
         <!-- Botón de Autorizaciones en Tiempo Real -->
         <a href="{{ route('admin.autorizaciones.index') }}" class="btn btn-sm btn-outline-warning text-dark border d-flex align-items-center" style="gap: 6px; background-color: #fffbeb;">

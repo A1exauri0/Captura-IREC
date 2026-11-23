@@ -12,21 +12,9 @@
 
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- TailwindCSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- TailwindCSS compilado con Vite -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: '#0078d7',
-                    }
-                }
-            }
-        }
-    </script>
     <!-- Módulos JS de captura -->
     <script src="{{ asset('js/captura/capturaReglas.js') }}"></script>
     <script src="{{ asset('js/captura/capturaArchivos.js') }}"></script>

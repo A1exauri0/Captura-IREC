@@ -10,6 +10,7 @@ use App\Http\Controllers\NotariasController;
 use App\Http\Controllers\TurnoController;
 use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\PeticionAutorizacionController;
+use App\Http\Controllers\AccesoController;
 
 // Autenticación
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
@@ -56,6 +57,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/descargar_excel_resumen', [ReportesCapturasController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
         Route::post('/descargar_excel_general', [ReportesCapturasController::class, 'descargar_excel_general'])->name('descargar_excel_general');
         Route::post('/descargar_excel_delegacion', [ReportesCapturasController::class, 'descargar_excel_delegacion'])->name('descargar_excel_delegacion');
+        Route::get('/detalles_renombre', [ReportesCapturasController::class, 'detalles_renombre_registros'])->name('detalles_renombre');
     });
 
     // 4. INDICADORES Y PRODUCTIVIDAD: NOTARÍAS (auditoria_notarias)
@@ -65,6 +67,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/dashboard_capturas_notarias', [ReportesCapturasController::class, 'dashboard_capturas_notarias'])->name('dashboard_capturas_notarias');
         Route::post('/descargar_excel_capturas_notarias', [ReportesCapturasController::class, 'descargar_excel_capturas_notarias'])->name('descargar_excel_capturas_notarias');
         Route::post('/descargar_excel_general_notarias', [ReportesCapturasController::class, 'descargar_excel_general'])->name('descargar_excel_general_notarias');
+        Route::get('/detalles_renombre', [ReportesCapturasController::class, 'detalles_renombre_notarias'])->name('detalles_renombre');
     });
 
     // 5. INDICADORES, PRODUCTIVIDAD, BITÁCORA, EXPLORADOR GLOBAL Y SESIONES EN VIVO: SELLOS (auditoria_sellos)
@@ -119,5 +122,21 @@ Route::middleware(['auth'])->group(function () {
     // 8. CATÁLOGOS (DELEGACIONES, MUNICIPIOS, LOCALIDADES Y RUTAS PDF)
     Route::name('admin.catalogos.')->prefix('catalogos')->group(function () {
         Route::get('/', [CatalogoController::class, 'index'])->name('index');
+    });
+
+    // 9. CRUD UNIFICADO DE USUARIOS, ROLES Y PERMISOS
+    Route::name('admin.acceso.')->prefix('acceso')->group(function () {
+        Route::get('/', [AccesoController::class, 'index'])->name('index');
+        Route::post('/usuarios', [AccesoController::class, 'storeUser'])->name('usuarios.store');
+        Route::put('/usuarios/{id}', [AccesoController::class, 'updateUser'])->name('usuarios.update');
+        Route::delete('/usuarios/{id}', [AccesoController::class, 'destroyUser'])->name('usuarios.destroy');
+
+        Route::post('/roles', [AccesoController::class, 'storeRole'])->name('roles.store');
+        Route::put('/roles/{id}', [AccesoController::class, 'updateRole'])->name('roles.update');
+        Route::delete('/roles/{id}', [AccesoController::class, 'destroyRole'])->name('roles.destroy');
+
+        Route::post('/permisos', [AccesoController::class, 'storePermission'])->name('permisos.store');
+        Route::put('/permisos/{id}', [AccesoController::class, 'updatePermission'])->name('permisos.update');
+        Route::delete('/permisos/{id}', [AccesoController::class, 'destroyPermission'])->name('permisos.destroy');
     });
 });

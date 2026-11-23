@@ -18,33 +18,8 @@
     <!-- Bootstrap 4.6 CSS (compatibilidad con grillas y tablas de reportes) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 
-    <!-- TailwindCSS CDN con configuración corporativa IREC -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            corePlugins: { preflight: false },
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        display: ['Plus Jakarta Sans', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0284c7',
-                            600: '#0369a1',
-                            700: '#034d6d',
-                            800: '#075985',
-                            900: '#0c4a6e',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- TailwindCSS compilado localmente con Vite (sin CDN) -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <!-- jQuery, Bootstrap Bundle, Chart.js, SweetAlert2, Pusher & Echo -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -222,31 +197,49 @@
                 });
             }
 
-            // Inicializar Laravel Echo para tiempo real
+            // Inicializar Laravel Echo conectado a Laravel Reverb
             if (typeof Pusher !== 'undefined' && typeof Echo !== 'undefined') {
                 try {
-                    window.Pusher = Pusher;
-                    window.Echo = new Echo({
-                        broadcaster: 'pusher',
-                        key: '{{ config("broadcasting.connections.pusher.key", env("PUSHER_APP_KEY", "stellum_key")) }}',
-                        wsHost: window.location.hostname,
-                        wsPort: {{ env('PUSHER_PORT', 6001) }},
-                        wssPort: {{ env('PUSHER_PORT', 6001) }},
-                        forceTLS: false,
-                        encrypted: false,
-                        disableStats: true,
-                        enabledTransports: ['ws', 'wss'],
-                    });
+                    const reverbKey = '{{ config("broadcasting.connections.reverb.key", env("REVERB_APP_KEY", "")) }}';
+                    const reverbHost = '{{ config("broadcasting.connections.reverb.options.host", env("REVERB_HOST", "127.0.0.1")) }}';
+                    const reverbPort = {{ (int) config('broadcasting.connections.reverb.options.port', env('REVERB_PORT', 8080)) }};
+                    const reverbScheme = '{{ config("broadcasting.connections.reverb.options.scheme", env("REVERB_SCHEME", "http")) }}';
+                    const useTLS = reverbScheme === 'https';
 
-                    window.Echo.connector.pusher.connection.bind('connected', function () {
-                        const badge = document.getElementById('ws-status-indicator');
-                        if (badge) {
-                            badge.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>WS Activo';
-                            badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 d-none d-md-inline-flex align-items-center';
-                        }
-                    });
+                    if (reverbKey) {
+                        Pusher.logToConsole = false;
+                        window.Pusher = Pusher;
+                        window.Echo = new Echo({
+                            broadcaster: 'pusher',
+                            key: reverbKey,
+                            cluster: 'mt1',
+                            wsHost: reverbHost || window.location.hostname,
+                            wsPort: reverbPort,
+                            wssPort: reverbPort,
+                            forceTLS: useTLS,
+                            encrypted: useTLS,
+                            disableStats: true,
+                            enabledTransports: useTLS ? ['ws', 'wss'] : ['ws'],
+                        });
+
+                        window.Echo.connector.pusher.connection.bind('connected', function () {
+                            const badge = document.getElementById('ws-status-indicator');
+                            if (badge) {
+                                badge.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>WS Activo';
+                                badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 d-none d-md-inline-flex align-items-center';
+                            }
+                        });
+
+                        window.Echo.connector.pusher.connection.bind('unavailable', function () {
+                            const badge = document.getElementById('ws-status-indicator');
+                            if (badge) {
+                                badge.innerHTML = '<span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>WS Standby';
+                                badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 d-none d-md-inline-flex align-items-center';
+                            }
+                        });
+                    }
                 } catch (e) {
-                    console.warn('WebSocket local no disponible, operando en modo estándar:', e);
+                    // Fallback silencioso si WebSocket no está iniciado
                 }
             }
         });

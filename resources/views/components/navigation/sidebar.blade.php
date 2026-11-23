@@ -1,172 +1,180 @@
 <aside id="app-sidebar">
     <!-- Brand Header -->
-    <div class="px-5 py-4 border-b border-slate-700/70 d-flex align-items-center justify-content-between">
-        <a href="{{ url('/') }}" class="d-flex align-items-center text-white text-decoration-none" style="gap: 12px;">
-            <div class="w-10 h-10 rounded-xl bg-sky-600 d-flex align-items-center justify-content-center shadow-md">
-                <i class="fa-solid fa-file-shield text-white text-lg"></i>
+    <div class="px-4 py-3.5 border-b border-slate-800/80 d-flex align-items-center justify-content-between flex-shrink-0">
+        <a href="{{ url('/') }}" class="d-flex align-items-center text-white text-decoration-none" style="gap: 11px;">
+            <div class="w-9 h-9 rounded-xl bg-sky-600 d-flex align-items-center justify-content-center shadow-sm">
+                <i class="fa-solid fa-file-shield text-white text-base"></i>
             </div>
             <div>
-                <span class="font-weight-bold d-block text-base tracking-tight text-white" style="line-height: 1.1;">CAPTURA IREC</span>
-                <span class="text-xs text-sky-400 font-medium">Gestión & Auditoría PDF</span>
+                <span class="font-weight-bold d-block text-sm tracking-tight text-white" style="line-height: 1.15;">CAPTURA IREC</span>
+                <span class="text-slate-400 font-medium" style="font-size: 0.7rem;">Auditoría Documental</span>
             </div>
         </a>
     </div>
 
-    <!-- Navigation Links -->
-    <div class="flex-1 overflow-y-auto px-3 py-4" style="scrollbar-width: thin;">
+    <!-- Navigation Links con Scroll Personalizado (sin barra nativa del navegador) -->
+    <div class="sidebar-scroll-wrapper flex-1 min-h-0">
+        <nav id="sidebar-scroll-area" class="custom-scroll h-full overflow-y-auto px-3 py-4">
 
-        <!-- 1. ESTACIÓN DE CAPTURA -->
-        <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Operación Capturistas
-        </div>
-        <ul class="list-unstyled mb-4">
-            <li class="mb-1">
-                <a href="{{ route('admin.captura.index') }}"
-                   class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.captura.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-desktop w-6 text-center mr-2 text-sky-400"></i>
-                    <span>Estación de Captura</span>
-                    <span class="ml-auto badge badge-info" style="font-size: 0.65rem;">Full</span>
-                </a>
-            </li>
-        </ul>
+            <!-- 1. OPERACIÓN -->
+            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                Operación
+            </div>
+            <ul class="list-unstyled mb-4">
+                <li class="mb-1">
+                    <a href="{{ route('admin.captura.index') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.captura.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-desktop w-5 text-center mr-2.5 {{ request()->routeIs('admin.captura.*') ? 'text-white' : 'text-sky-400' }}"></i>
+                        <span>Estación de Captura</span>
+                    </a>
+                </li>
+            </ul>
 
-        <!-- 2. MONITOREO Y AUTORIZACIONES EN VIVO -->
-        <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Tiempo Real & Búsqueda
-        </div>
-        <ul class="list-unstyled mb-4">
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_sellos.reportes.lotes_trabajando') }}"
-                   class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.lotes_trabajando') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-satellite-dish w-6 text-center mr-2 text-emerald-400"></i>
-                    <span>Sesiones / Lotes Activos</span>
-                    <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300" style="font-size: 0.65rem;">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"></span>LIVE
-                    </span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.autorizaciones.index') }}"
-                   class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.autorizaciones.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-shield-halved w-6 text-center mr-2 text-amber-400"></i>
-                    <span>Autorizaciones en Vivo</span>
-                    <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300" style="font-size: 0.65rem;">
-                        WS
-                    </span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_sellos.reportes.buscar_archivos') }}"
-                   class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.buscar_archivos') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-magnifying-glass-chart w-6 text-center mr-2 text-sky-400"></i>
-                    <span>Explorador Global PDF</span>
-                </a>
-            </li>
-        </ul>
+            <!-- 2. TIEMPO REAL -->
+            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                Tiempo Real
+            </div>
+            <ul class="list-unstyled mb-4">
+                <li class="mb-1">
+                    <a href="{{ route('admin.analytics_sellos.reportes.lotes_trabajando') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.lotes_trabajando') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-satellite-dish w-5 text-center mr-2.5 {{ request()->routeIs('admin.analytics_sellos.reportes.lotes_trabajando') ? 'text-white' : 'text-emerald-400' }}"></i>
+                        <span>Sesiones Activas</span>
+                        <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" style="font-size: 0.6rem;">LIVE</span>
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <a href="{{ route('admin.autorizaciones.index') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.autorizaciones.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-shield-halved w-5 text-center mr-2.5 {{ request()->routeIs('admin.autorizaciones.*') ? 'text-white' : 'text-amber-400' }}"></i>
+                        <span>Autorizaciones</span>
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <a href="{{ route('admin.analytics_sellos.reportes.buscar_archivos') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.buscar_archivos') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-magnifying-glass w-5 text-center mr-2.5 {{ request()->routeIs('admin.analytics_sellos.reportes.buscar_archivos') ? 'text-white' : 'text-sky-400' }}"></i>
+                        <span>Explorador PDF</span>
+                    </a>
+                </li>
+            </ul>
 
-        <!-- 3. INDICADORES (AVANCE GENERAL) -->
-        <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Indicadores de Avance
-        </div>
-        <ul class="list-unstyled mb-4">
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_capturas.reportes.index') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_capturas.reportes.index') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-chart-pie w-6 text-center mr-2 text-indigo-400"></i>
-                    <span>Avance Registros</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_sellos.reportes.index') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_sellos.reportes.index') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-chart-column w-6 text-center mr-2 text-emerald-400"></i>
-                    <span>Avance Sellos</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_digitalizacion.reportes.capturas') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_digitalizacion.reportes.capturas') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-chart-line w-6 text-center mr-2 text-sky-400"></i>
-                    <span>Avance Notarías</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_catastro.reportes.index') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_catastro.reportes.index') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-chart-area w-6 text-center mr-2 text-amber-400"></i>
-                    <span>Avance Catastro</span>
-                </a>
-            </li>
-        </ul>
+            <!-- 3. ANALÍTICAS (Unificado con pestañas superiores por tipo de documento) -->
+            @php
+                $enIndicadores = request()->routeIs(
+                    'admin.analytics_capturas.reportes.index',
+                    'admin.analytics_sellos.reportes.index',
+                    'admin.analytics_digitalizacion.reportes.capturas',
+                    'admin.analytics_catastro.reportes.index'
+                );
+                $enProductividad = request()->routeIs(
+                    'admin.analytics_capturas.reportes.usuarios',
+                    'admin.analytics_sellos.reportes.usuarios',
+                    'admin.analytics_digitalizacion.reportes.reportes_capturas_notarias',
+                    'admin.analytics_catastro.reportes.usuarios'
+                );
+                $enBitacoras = request()->routeIs(
+                    'admin.analytics_capturas.reportes.detalles_renombre',
+                    'admin.analytics_sellos.reportes.detalles_renombre',
+                    'admin.analytics_digitalizacion.reportes.detalles_renombre',
+                    'admin.analytics_catastro.reportes.detalles_renombre'
+                );
+            @endphp
+            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                Analíticas & Bitácora
+            </div>
+            <ul class="list-unstyled mb-4">
+                <li class="mb-1">
+                    <a href="{{ route('admin.analytics_capturas.reportes.index') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $enIndicadores ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-chart-pie w-5 text-center mr-2.5 {{ $enIndicadores ? 'text-white' : 'text-indigo-400' }}"></i>
+                        <span>Indicadores KPI</span>
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <a href="{{ route('admin.analytics_capturas.reportes.usuarios') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $enProductividad ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-user-chart w-5 text-center mr-2.5 {{ $enProductividad ? 'text-white' : 'text-emerald-400' }}"></i>
+                        <span>Productividad</span>
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <a href="{{ route('admin.analytics_capturas.reportes.detalles_renombre') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $enBitacoras ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-clock-rotate-left w-5 text-center mr-2.5 {{ $enBitacoras ? 'text-white' : 'text-teal-400' }}"></i>
+                        <span>Bitácoras</span>
+                    </a>
+                </li>
+            </ul>
 
-        <!-- 4. PRODUCTIVIDAD POR USUARIO & BITÁCORA -->
-        <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Productividad & Bitácora
-        </div>
-        <ul class="list-unstyled mb-4">
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_capturas.reportes.usuarios') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_capturas.reportes.usuarios') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-users-rectangle w-6 text-center mr-2 text-indigo-300"></i>
-                    <span>Usuarios Registros</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_sellos.reportes.usuarios') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_sellos.reportes.usuarios') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-user-check w-6 text-center mr-2 text-emerald-300"></i>
-                    <span>Usuarios Sellos</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_digitalizacion.reportes.reportes_capturas_notarias') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_digitalizacion.reportes.reportes_capturas_notarias') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-building-columns w-6 text-center mr-2 text-sky-300"></i>
-                    <span>Usuarios Notarías</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_catastro.reportes.usuarios') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_catastro.reportes.usuarios') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-map-location-dot w-6 text-center mr-2 text-amber-300"></i>
-                    <span>Usuarios Catastro</span>
-                </a>
-            </li>
-            <li class="mb-1 mt-2 pt-2 border-t border-slate-700/60">
-                <a href="{{ route('admin.analytics_sellos.reportes.detalles_renombre') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_sellos.reportes.detalles_renombre') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-clock-rotate-left w-6 text-center mr-2 text-teal-400"></i>
-                    <span>Bitácora Sellos</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.analytics_catastro.reportes.detalles_renombre') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_catastro.reportes.detalles_renombre') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-file-pen w-6 text-center mr-2 text-purple-400"></i>
-                    <span>Bitácora Catastro</span>
-                </a>
-            </li>
-        </ul>
+            <!-- 4. ADMINISTRACIÓN -->
+            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                Administración
+            </div>
+            <ul class="list-unstyled mb-2">
+                <li class="mb-1">
+                    <a href="{{ route('admin.acceso.index') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.acceso.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-users-gear w-5 text-center mr-2.5 {{ request()->routeIs('admin.acceso.*') ? 'text-white' : 'text-sky-400' }}"></i>
+                        <span>Usuarios y Roles</span>
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <a href="{{ route('admin.turnos.index') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.turnos.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-user-clock w-5 text-center mr-2.5 {{ request()->routeIs('admin.turnos.*') ? 'text-white' : 'text-amber-400' }}"></i>
+                        <span>Turnos</span>
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <a href="{{ route('admin.catalogos.index') }}"
+                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.catalogos.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                        <i class="fa-solid fa-folder-tree w-5 text-center mr-2.5 {{ request()->routeIs('admin.catalogos.*') ? 'text-white' : 'text-rose-400' }}"></i>
+                        <span>Catálogos y Rutas</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
 
-        <!-- 5. CONFIGURACIÓN, TURNOS Y CATÁLOGOS -->
-        <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Configuración & CRUDs
-        </div>
-        <ul class="list-unstyled mb-2">
-            <li class="mb-1">
-                <a href="{{ route('admin.turnos.index') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.turnos.*') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-user-clock w-6 text-center mr-2 text-amber-400"></i>
-                    <span>Turnos y Horarios</span>
-                </a>
-            </li>
-            <li class="mb-1">
-                <a href="{{ route('admin.catalogos.index') }}"
-                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.catalogos.*') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-map-pin w-6 text-center mr-2 text-rose-400"></i>
-                    <span>Catálogos y Rutas PDF</span>
-                </a>
-            </li>
-        </ul>
+        <!-- Barra de scroll personalizada tipo overlay -->
+        <div id="sidebar-scroll-thumb" class="sidebar-scroll-thumb"></div>
     </div>
 </aside>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const area = document.getElementById('sidebar-scroll-area');
+        const thumb = document.getElementById('sidebar-scroll-thumb');
+        if (!area || !thumb) return;
+
+        let hideTimer = null;
+        function updateThumb() {
+            const scrollHeight = area.scrollHeight;
+            const clientHeight = area.clientHeight;
+            if (scrollHeight <= clientHeight + 2) {
+                thumb.style.opacity = '0';
+                return;
+            }
+            const ratio = clientHeight / scrollHeight;
+            const thumbHeight = Math.max(28, clientHeight * ratio);
+            const maxTop = clientHeight - thumbHeight;
+            const scrollRatio = area.scrollTop / (scrollHeight - clientHeight);
+            thumb.style.height = thumbHeight + 'px';
+            thumb.style.transform = 'translateY(' + (scrollRatio * maxTop) + 'px)';
+        }
+
+        function showThumb() {
+            updateThumb();
+            if (area.scrollHeight > area.clientHeight + 2) {
+                thumb.classList.add('is-visible');
+                clearTimeout(hideTimer);
+                hideTimer = setTimeout(() => thumb.classList.remove('is-visible'), 900);
+            }
+        }
+
+        area.addEventListener('scroll', showThumb, { passive: true });
+        area.addEventListener('mouseenter', updateThumb);
+        window.addEventListener('resize', updateThumb);
+        updateThumb();
+    });
+</script>

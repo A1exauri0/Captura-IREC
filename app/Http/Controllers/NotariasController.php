@@ -10,7 +10,6 @@ use App\Models\Anio;
 use App\Models\Delegaciones;
 use App\Models\LoteCaptura;
 use App\Models\User;
-use App\Models\LoteCaptura;
 
 class NotariasController extends Controller
 {

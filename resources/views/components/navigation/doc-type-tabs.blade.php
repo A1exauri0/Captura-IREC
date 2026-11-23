@@ -38,15 +38,25 @@
                     <i class="fa-solid fa-map-location-dot mr-1"></i> Catastro
                 </a>
             @elseif(($seccion ?? '') === 'renombres')
+                <a href="{{ route('admin.analytics_capturas.reportes.detalles_renombre') }}"
+                   class="btn btn-sm {{ request()->routeIs('admin.analytics_capturas.reportes.detalles_renombre') ? 'btn-primary' : 'btn-light border' }}"
+                   style="{{ request()->routeIs('admin.analytics_capturas.reportes.detalles_renombre') ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">
+                    <i class="fa-solid fa-file-signature mr-1"></i> Bitácora Registros
+                </a>
                 <a href="{{ route('admin.analytics_sellos.reportes.detalles_renombre') }}"
                    class="btn btn-sm {{ request()->routeIs('admin.analytics_sellos.reportes.detalles_renombre') ? 'btn-primary' : 'btn-light border' }}"
                    style="{{ request()->routeIs('admin.analytics_sellos.reportes.detalles_renombre') ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">
-                    <i class="fa-solid fa-stamp mr-1"></i> Historial Sellos
+                    <i class="fa-solid fa-stamp mr-1"></i> Bitácora Sellos
+                </a>
+                <a href="{{ route('admin.analytics_digitalizacion.reportes.detalles_renombre') }}"
+                   class="btn btn-sm {{ request()->routeIs('admin.analytics_digitalizacion.reportes.detalles_renombre') ? 'btn-primary' : 'btn-light border' }}"
+                   style="{{ request()->routeIs('admin.analytics_digitalizacion.reportes.detalles_renombre') ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">
+                    <i class="fa-solid fa-landmark mr-1"></i> Bitácora Notarías
                 </a>
                 <a href="{{ route('admin.analytics_catastro.reportes.detalles_renombre') }}"
                    class="btn btn-sm {{ request()->routeIs('admin.analytics_catastro.reportes.detalles_renombre') ? 'btn-primary' : 'btn-light border' }}"
                    style="{{ request()->routeIs('admin.analytics_catastro.reportes.detalles_renombre') ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">
-                    <i class="fa-solid fa-map-location-dot mr-1"></i> Historial Catastro
+                    <i class="fa-solid fa-map-location-dot mr-1"></i> Bitácora Catastro
                 </a>
             @else
                 <a href="{{ route('admin.analytics_capturas.reportes.usuarios') }}"
