@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('titulo', 'Captura IREC - Sistema de Gestión y Auditoría')</title>
+    <title>@yield('titulo', 'Digitalización Chiapas 2026 - Sistema de Gestión y Auditoría')</title>
     <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 

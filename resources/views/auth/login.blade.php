@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión — Captura IREC</title>
+    <title>Iniciar Sesión — Digitalización Chiapas 2026</title>
     <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,7 +14,7 @@
             <div class="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center mx-auto mb-3">
                 <i class="fa-solid fa-file-shield text-2xl text-sky-300"></i>
             </div>
-            <h1 class="text-2xl font-bold tracking-tight">CAPTURA IREC</h1>
+            <h1 class="text-2xl font-bold tracking-tight">Digitalización Chiapas 2026</h1>
             <p class="text-xs text-sky-200 mt-1">Sistema de Captura, Validación y Trazabilidad Documental</p>
         </div>
 

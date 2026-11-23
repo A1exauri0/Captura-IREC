@@ -144,7 +144,7 @@ JSON;
                 <i class="fa-solid fa-file-shield text-white text-base"></i>
             </div>
             <div>
-                <span class="font-weight-bold d-block tracking-tight text-white" style="font-size: 0.9rem; line-height: 1.15;">CAPTURA IREC</span>
+                <span class="font-weight-bold d-block tracking-tight text-white" style="font-size: 0.9rem; line-height: 1.15;">Digitalización Chiapas 2026</span>
                 <span class="text-slate-400 font-medium" style="font-size: 0.7rem;">Auditoría Documental</span>
             </div>
         </a>

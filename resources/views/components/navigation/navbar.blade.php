@@ -28,7 +28,7 @@
         </button>
 
         <div class="d-none d-sm-flex flex-column">
-            <span class="font-weight-bold text-slate-800 text-sm">@yield('titulo', 'Captura IREC')</span>
+            <span class="font-weight-bold text-slate-800 text-sm">@yield('titulo', 'Digitalización Chiapas 2026')</span>
             <span class="text-xs text-muted">Trazabilidad y Validación Documental</span>
         </div>
     </div>
