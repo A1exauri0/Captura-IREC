@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Delegaciones;
 use App\Models\Municipios;
 use App\Models\Localidades;
+use App\Models\CatalogoInconsistencia;
 use Illuminate\Http\Request;
 
 class CatalogoController extends Controller
@@ -208,5 +209,66 @@ class CatalogoController extends Controller
 
         return redirect()->route('admin.municipios.index', ['municipio_id' => $municipioId])
             ->with('success', "Localidad '{$nombre}' eliminada.");
+    }
+
+    // =========================================================================
+    // CRUD CATÁLOGO DE INCONSISTENCIAS (R01-R09)
+    // =========================================================================
+
+    public function catalogoInconsistencias()
+    {
+        $items = CatalogoInconsistencia::orderBy('codigo')->get();
+        return view('configuracion.catalogo_inconsistencias', compact('items'));
+    }
+
+    public function storeCatalogoInconsistencia(Request $request)
+    {
+        $data = $request->validate([
+            'codigo'            => 'required|string|max:10|unique:catalogo_inconsistencias,codigo',
+            'motivo_rechazo'    => 'required|string|max:255',
+            'accion_correctiva' => 'required|string|max:255',
+        ]);
+
+        CatalogoInconsistencia::create([
+            'codigo'            => strtoupper(trim($data['codigo'])),
+            'motivo_rechazo'    => trim($data['motivo_rechazo']),
+            'accion_correctiva' => trim($data['accion_correctiva']),
+            'activo'            => true,
+        ]);
+
+        return redirect()->route('admin.catalogo_inconsistencias.index')
+            ->with('success', "Código {$data['codigo']} agregado al catálogo.");
+    }
+
+    public function updateCatalogoInconsistencia(Request $request, int $id)
+    {
+        $item = CatalogoInconsistencia::findOrFail($id);
+
+        $data = $request->validate([
+            'codigo'            => 'required|string|max:10|unique:catalogo_inconsistencias,codigo,' . $item->id,
+            'motivo_rechazo'    => 'required|string|max:255',
+            'accion_correctiva' => 'required|string|max:255',
+            'activo'            => 'nullable|boolean',
+        ]);
+
+        $item->update([
+            'codigo'            => strtoupper(trim($data['codigo'])),
+            'motivo_rechazo'    => trim($data['motivo_rechazo']),
+            'accion_correctiva' => trim($data['accion_correctiva']),
+            'activo'            => $request->has('activo') ? (bool) $request->activo : $item->activo,
+        ]);
+
+        return redirect()->route('admin.catalogo_inconsistencias.index')
+            ->with('success', "Código {$item->codigo} actualizado.");
+    }
+
+    public function destroyCatalogoInconsistencia(int $id)
+    {
+        $item = CatalogoInconsistencia::findOrFail($id);
+        $codigo = $item->codigo;
+        $item->delete();
+
+        return redirect()->route('admin.catalogo_inconsistencias.index')
+            ->with('success', "Código {$codigo} eliminado del catálogo.");
     }
 }

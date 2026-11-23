@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Validación PDF</title>
+    <title>Captura Sellos</title>
     <!-- PWA Manifest & Meta -->
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <meta name="theme-color" content="#1f2937">
-    <link rel="apple-touch-icon" href="{{asset('img/favicon/favicon.png')}}">
+    <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('img/favicon.png') }}">
 
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -38,40 +39,72 @@
         <div
             class="relative bg-gray-200 dark:bg-gray-800 px-8 py-6 min-h-[220px] flex items-start gap-12 transition-colors duration-200">
 
-            <!-- Bloque 1: Reglas (Solo Sellos activo temporalmente) -->
-            <div id="panelReglas" class="flex flex-col gap-3 min-w-[180px] mt-2">
-                {{-- Temporalmente oculto: solo se trabaja con Sellos
-                <label class="flex items-center gap-2 text-lg cursor-pointer hover:text-brand transition-colors">
-                    <input type="radio" name="regla" id="rbRegla1" class="w-5 h-5 accent-brand">
-                    Regla 1 (Registros)
-                </label>
-                --}}
-                <input type="radio" name="regla" id="rbRegla1" class="hidden">
-                <label class="flex items-center gap-2 text-lg cursor-pointer hover:text-brand transition-colors">
-                    <input type="radio" name="regla" id="rbRegla2" class="w-5 h-5 accent-brand" checked>
-                    Regla 2 (Sellos)
-                </label>
+            <!-- Bloque 1: Reglas (Oculto visualmente, pero mantiene Regla 2 Sellos siempre activa) -->
+            <div id="panelReglas" class="hidden">
+                <input type="radio" name="regla" id="rbRegla1">
+                <input type="radio" name="regla" id="rbRegla2" checked>
             </div>
 
-            <!-- Bloque 2: Input y Estado -->
-            <div class="flex flex-col gap-2 flex-grow max-w-[500px]">
-                <div class="text-xl font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Delegación - Lote 60
+            <!-- Bloque 2: Inputs Segmentados Regla de Sellos + Nombre Final y Estado -->
+            <div class="flex flex-col gap-2 flex-grow max-w-[740px]">
+                <div class="flex items-center justify-between">
+                    <div class="text-lg font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Delegación - Lote</div>
+                    <div class="text-sm text-gray-700 dark:text-gray-300 h-5" id="lblEstado">Estado</div>
                 </div>
-                <div class="text-lg text-gray-700 dark:text-gray-300 mb-1 h-6" id="lblEstado">Estado</div>
+
+                <!-- Grid de Campos de la Regla de Sellos (Delegación_Sección_Libro_Tomo_Volumen_Fracc_Año_Inscripción_Bis) -->
+                <div class="grid grid-cols-9 gap-1.5 bg-white/80 dark:bg-gray-900/60 p-2 rounded-lg border border-gray-300 dark:border-gray-700">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">1. Del.</label>
+                        <input type="text" id="selloDel" maxlength="2" value="01" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">2. Secc.</label>
+                        <input type="text" id="selloSecc" maxlength="2" value="00" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">3. Libro</label>
+                        <input type="text" id="selloLibro" maxlength="2" value="00" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">4. Tomo</label>
+                        <input type="text" id="selloTomo" maxlength="10" value="00" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">5. Vol.</label>
+                        <input type="text" id="selloVol" maxlength="2" value="00" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">6. Fracc.</label>
+                        <input type="text" id="selloFracc" maxlength="12" value="00" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">7. Año</label>
+                        <input type="text" id="selloAnio" maxlength="4" value="2024" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">8. Inscr.</label>
+                        <input type="text" id="selloInscr" maxlength="6" value="0001" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-600 dark:text-gray-300">9. Bis</label>
+                        <input type="text" id="selloBis" maxlength="2" value="00" class="sello-seg w-full px-1 py-1 text-center font-mono font-bold text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:border-brand focus:outline-none">
+                    </div>
+                </div>
 
                 <div class="flex gap-2">
                     <input type="text" id="txtNombre" autocomplete="off"
-                        class="w-full px-4 py-2 text-2xl font-bold bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-shadow text-gray-900 dark:text-white">
+                        class="w-full px-3 py-1.5 text-xl font-mono font-bold bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-shadow text-gray-900 dark:text-white">
 
                     <button id="btnRenombrar"
-                        class="px-5 py-2 text-xl font-bold bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm whitespace-nowrap">
+                        class="px-5 py-1.5 text-lg font-bold bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm whitespace-nowrap">
                         Renombrar
                     </button>
                 </div>
 
                 <div class="flex items-center gap-2">
                     <button id="btnLimpiar"
-                        class="mt-1 px-4 py-1 text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600 transition-colors flex items-center gap-1.5">
+                        class="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600 transition-colors flex items-center gap-1.5">
                         <i class="fa-solid fa-eraser text-xs"></i> Limpiar
                     </button>
                 </div>
@@ -93,33 +126,28 @@
                     </button>
                 </div>
 
-                <!-- Fila 2: Pantalla, Oscuro (Botón Mover eliminado por flujo Solo-BD) -->
+                <!-- Fila 2: Oscuro (Botón Pantalla eliminado) -->
                 <div class="flex items-center gap-2">
-                    <button id="btnPantallaCompleta"
-                        class="px-4 py-1.5 text-lg bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm flex items-center gap-2">
-                        <i class="fa-solid fa-expand"></i> Pantalla
-                    </button>
-
                     <button id="btnModo"
                         class="px-4 py-1.5 text-lg bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm flex items-center gap-2">
                         <i class="fa-solid fa-moon"></i> Oscuro
                     </button>
                 </div>
 
-                <!-- Rotación y Página -->
+                <!-- Rotación y Página (editable por el usuario con confirmación) -->
                 <div class="flex items-center gap-3 text-lg mt-1">
                     <strong class="mr-1">Rotar:</strong>
-                    <button id="btnRotarIzquierda" title="Rotar Izquierda"
+                    <button id="btnRotarIzquierda" title="Rotar página -90°"
                         class="w-10 h-9 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm">
                         <i class="fa-solid fa-rotate-left"></i>
                     </button>
-                    <button id="btnRotarDerecha" title="Rotar Derecha"
+                    <button id="btnRotarDerecha" title="Rotar página +90°"
                         class="w-10 h-9 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm">
                         <i class="fa-solid fa-rotate-right"></i>
                     </button>
                     <span class="ml-2">Pág</span>
-                    <input type="number" id="nudPagina" min="1" max="1" value="1" readonly
-                        class="w-16 px-2 py-1 text-center text-lg bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand shadow-sm pointer-events-none opacity-80">
+                    <input type="number" id="nudPagina" min="1" value="1"
+                        class="w-16 px-2 py-1 text-center text-lg font-bold bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand shadow-sm">
                 </div>
             </div>
 
@@ -851,29 +879,60 @@
                 }
             }
         });
-        document.getElementById('btnCerrarSesion').addEventListener('click', () => CapturaProcesos.cerrarSesion(ctx));
+        document.getElementById('btnCerrarSesion')?.addEventListener('click', () => CapturaProcesos.cerrarSesion(ctx));
 
-        document.getElementById('btnRotarIzquierda').addEventListener('click', () => CapturaProcesos.rotarPagina(ctx, -90));
-        document.getElementById('btnRotarDerecha').addEventListener('click', () => CapturaProcesos.rotarPagina(ctx, 90));
+        // Rotación física de página con modal de confirmación y registro en auditoría
+        async function confirmarYRotarPagina(grados) {
+            const pagInput = document.getElementById('nudPagina');
+            const pagina = Math.max(1, parseInt(pagInput?.value || '1', 10) || 1);
+            const direccion = grados > 0 ? '90° a la derecha' : '90° a la izquierda';
+            const confirmado = await ctx.solicitarConfirmacion(
+                'Confirmar rotación física',
+                `¿Deseas rotar físicamente la página ${pagina} del PDF (${direccion})? Este cambio modificará el archivo y quedará registrado en la auditoría.`,
+                'fa-rotate',
+                'text-amber-500'
+            );
+            if (!confirmado) return;
+            CapturaProcesos.rotarPagina(ctx, grados);
+        }
 
-        // ==================================================
-        // SISTEMA DE SEGURIDAD PANTALLA COMPLETA
-        // ==================================================
-        btnPantallaCompleta.replaceWith(btnPantallaCompleta.cloneNode(true));
-        const btnPantallaCompletaNuevo = document.getElementById('btnPantallaCompleta');
+        document.getElementById('btnRotarIzquierda')?.addEventListener('click', () => confirmarYRotarPagina(-90));
+        document.getElementById('btnRotarDerecha')?.addEventListener('click', () => confirmarYRotarPagina(90));
 
-        btnPantallaCompletaNuevo.addEventListener('click', () => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-                btnPantallaCompletaNuevo.innerHTML = '<i class="fa-solid fa-expand"></i> Pantalla';
-            } else {
-                document.documentElement.requestFullscreen().then(() => {
-                    btnPantallaCompletaNuevo.innerHTML = '<i class="fa-solid fa-compress"></i> Ventana';
-                }).catch(err => {
-                    solicitarConfirmacion("Pantalla Completa", "Error al activar pantalla completa: " + err.message, "fa-triangle-exclamation", "text-red-500", false);
-                });
+        // Sincronizar los 9 campos segmentados de la Regla de Sellos con #txtNombre
+        (function initSegmentosSellos() {
+            const ids = ['selloDel', 'selloSecc', 'selloLibro', 'selloTomo', 'selloVol', 'selloFracc', 'selloAnio', 'selloInscr', 'selloBis'];
+            const campos = ids.map(id => document.getElementById(id)).filter(Boolean);
+            const txtNombreEl = document.getElementById('txtNombre');
+            if (!campos.length || !txtNombreEl) return;
+
+            function construirNombreSellos() {
+                const valores = campos.map(c => (c.value || '').trim().toUpperCase());
+                txtNombreEl.value = valores.join('_');
+                txtNombreEl.dispatchEvent(new Event('input'));
             }
-        });
+
+            campos.forEach((campo, idx) => {
+                campo.addEventListener('input', construirNombreSellos);
+                campo.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && idx < campos.length - 1) {
+                        e.preventDefault();
+                        campos[idx + 1].focus();
+                        campos[idx + 1].select();
+                    }
+                });
+            });
+
+            // También cuando el usuario escribe directo en #txtNombre, reflejar en los segmentos
+            txtNombreEl.addEventListener('change', () => {
+                const partes = txtNombreEl.value.trim().split('_');
+                campos.forEach((c, idx) => {
+                    if (partes[idx] !== undefined) c.value = partes[idx];
+                });
+            });
+        })();
+
+        // Botón Pantalla Completa eliminado por requerimiento operativo
 
         document.addEventListener('fullscreenchange', () => {
             const btnPC = document.getElementById('btnPantallaCompleta');
@@ -1097,17 +1156,6 @@
             // Iniciar búsqueda automática de lote inmediatamente
             lblTotalPdf.innerText = del ? `${del.nombre} - Buscando lote automático...` : 'Buscando lote libre...';
             CapturaProcesos.cargarLoteDesdeServidor(ctx);
-
-            // Activar pantalla completa al primer click (gesto requerido por el navegador)
-            document.addEventListener('click', function activarFullscreen() {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen().then(() => {
-                        const btnPC = document.getElementById('btnPantallaCompleta');
-                        if (btnPC) btnPC.innerHTML = '<i class="fa-solid fa-compress"></i> Ventana';
-                    }).catch(() => {});
-                }
-                document.removeEventListener('click', activarFullscreen);
-            });
         });
     </script>
 

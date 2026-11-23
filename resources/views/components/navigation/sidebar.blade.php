@@ -40,8 +40,8 @@
                 "label": "Supervisión & Stellum",
                 "icon": "fa-solid fa-list-check",
                 "children": [
-                    { "label": "Inconsistencias (R01-R09)", "icon": "fa-solid fa-triangle-exclamation", "route": "admin.inconsistencias.index" },
-                    { "label": "Colisiones / Revisar", "icon": "fa-solid fa-code-compare", "route": "admin.colisiones.index" },
+                    { "label": "Inconsistencias", "icon": "fa-solid fa-triangle-exclamation", "route": "admin.inconsistencias.index" },
+                    { "label": "Archivos por revisar", "icon": "fa-solid fa-code-compare", "route": "admin.colisiones.index" },
                     { "label": "Aprobación de Renombres", "icon": "fa-solid fa-check-double", "route": "admin.aprobacion.index" }
                 ]
             }
@@ -123,7 +123,8 @@
                 "children": [
                     { "label": "Rutas PDF", "icon": "fa-solid fa-network-wired", "route": "admin.catalogos.index" },
                     { "label": "Delegaciones", "icon": "fa-solid fa-building-flag", "route": "admin.delegaciones.index" },
-                    { "label": "Municipios y Localidades", "icon": "fa-solid fa-map-location-dot", "route": "admin.municipios.index" }
+                    { "label": "Municipios y Localidades", "icon": "fa-solid fa-map-location-dot", "route": "admin.municipios.index" },
+                    { "label": "Catálogo Inconsistencias", "icon": "fa-solid fa-triangle-exclamation", "route": "admin.catalogo_inconsistencias.index" }
                 ]
             }
         ]

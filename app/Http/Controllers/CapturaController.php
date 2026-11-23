@@ -739,40 +739,45 @@ class CapturaController extends Controller
      */
     public function rotar(Request $request)
     {
-        $disco = $request->input('disco');
-        $rutaArchivo = $request->input('ruta_archivo');
-        $pagina = (int) $request->input('pagina', 1);
+        $disco = (string) $request->input('disco', '');
+        $rutaArchivo = (string) $request->input('ruta_archivo', '');
+        $pagina = max(1, (int) $request->input('pagina', 1));
         $grados = (int) $request->input('grados', 90);
+        $delegacionId = $request->input('delegacion_id');
+        $lote = (string) $request->input('lote', 'LOTE');
 
-        $rutaArchivo = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rutaArchivo);
-
-        // \Log::info("Parámetros de rotar:", ['disco' => $disco, 'ruta' => $rutaArchivo, 'pagina' => $pagina, 'grados' => $grados]);
-
-        if (!in_array($disco, ['irec', 'cats', 'rciv'])) {
-            // \Log::warning("Disco no válido en rotar: " . $disco);
-            return response()->json(['ok' => false, 'mensaje' => 'Disco no válido.']);
+        $rutaConfigurada = $this->obtenerRutaRaizConfigurada($disco);
+        if (!in_array($disco, ['irec', 'cats', 'rciv']) && !$rutaConfigurada) {
+            return response()->json(['ok' => false, 'mensaje' => 'Disco o ruta configurada no válida para rotar.']);
         }
 
-        $storage = Storage::disk($disco);
-        $rutaArchivoFisica = $storage->path($rutaArchivo);
-        $existe = file_exists($rutaArchivoFisica);
-        // \Log::info("Existe archivo físico?: " . ($existe ? 'SI' : 'NO') . " - ruta: " . $rutaArchivoFisica);
+        $storage = in_array($disco, ['irec', 'cats', 'rciv'])
+            ? Storage::disk($disco)
+            : Storage::build(['driver' => 'local', 'root' => $rutaConfigurada]);
 
-        if (!$existe) {
-            return response()->json(['ok' => false, 'mensaje' => 'El archivo no existe.']);
+        $rutaNormalizada = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rutaArchivo);
+        $rutaArchivoFisica = $storage->path($rutaNormalizada);
+
+        if (!file_exists($rutaArchivoFisica)) {
+            return response()->json(['ok' => false, 'mensaje' => 'El archivo físico no existe en el directorio configurado.']);
         }
 
         try {
-            $pdfContenido = $storage->get($rutaArchivo);
+            $pdfContenido = file_get_contents($rutaArchivoFisica);
 
-            // Crear archivos temporales en el directorio temporal del sistema
             $tempOri = tempnam(sys_get_temp_dir(), 'pdf_ori_');
             $tempDest = tempnam(sys_get_temp_dir(), 'pdf_dest_');
-
             file_put_contents($tempOri, $pdfContenido);
 
             $pdf = new RotatableFpdi();
             $cantPaginas = $pdf->setSourceFile($tempOri);
+
+            if ($pagina > $cantPaginas) {
+                return response()->json([
+                    'ok'      => false,
+                    'mensaje' => "La página {$pagina} excede el total de páginas del PDF ({$cantPaginas}).",
+                ]);
+            }
 
             for ($i = 1; $i <= $cantPaginas; $i++) {
                 $tpl = $pdf->importPage($i);
@@ -790,7 +795,7 @@ class CapturaController extends Controller
                         $pdf->Rotate($anguloRotacion, $wNueva / 2, $hNueva / 2);
                         $pdf->useTemplate($tpl, ($wNueva - $wOrig) / 2, ($hNueva - $hOrig) / 2, $wOrig, $hOrig);
                         $pdf->Rotate(0);
-                    } else if ($anguloRotacion === 180) {
+                    } elseif ($anguloRotacion === 180) {
                         $pdf->AddPage($wOrig > $hOrig ? 'L' : 'P', [$wOrig, $hOrig]);
                         $pdf->Rotate(180, $wOrig / 2, $hOrig / 2);
                         $pdf->useTemplate($tpl, 0, 0, $wOrig, $hOrig);
@@ -806,19 +811,45 @@ class CapturaController extends Controller
             }
 
             $pdf->Output($tempDest, 'F');
+            file_put_contents($rutaArchivoFisica, file_get_contents($tempDest));
 
-            // Guardar de vuelta al disco
-            $storage->put($rutaArchivo, file_get_contents($tempDest));
+            // Registrar en auditoría qué página se rotó físicamente
+            $usuario = Auth::user();
+            $nombreSinExt = pathinfo($rutaArchivoFisica, PATHINFO_FILENAME);
+            DB::table('auditoria_sellos')->insert([
+                'fecha_hora'       => now()->format('Y-m-d H:i:s'),
+                'turno'            => $usuario?->turnoRelacion?->nombre ?? $usuario?->turno ?? 'Matutino',
+                'user_id'          => $usuario?->id,
+                'categoria'        => 'Rotación',
+                'pc'               => $request->ip(),
+                'directorio'       => $disco,
+                'lote'             => $lote,
+                'accion'           => 'rotar_pagina',
+                'archivo_original' => $nombreSinExt,
+                'archivo_nuevo'    => $nombreSinExt,
+                'ruta'             => $rutaArchivoFisica,
+                'ruta_origen'      => $rutaArchivoFisica,
+                'ruta_propuesta'   => $rutaArchivoFisica,
+                'ruta_destino'     => $rutaArchivoFisica,
+                'delegacion_id'    => $delegacionId,
+                'paginas'          => $cantPaginas,
+                'detalles'         => "Página {$pagina} de {$cantPaginas} rotada {$grados}° físicamente en el PDF.",
+                'estado_aplicacion'=> 'aplicado',
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]);
 
             return response()->json([
-                'ok' => true,
-                'mensaje' => "Página $pagina rotada $grados grados correctamente."
+                'ok'           => true,
+                'pagina'       => $pagina,
+                'total_paginas'=> $cantPaginas,
+                'mensaje'      => "Página {$pagina} rotada {$grados}° físicamente y registrada en auditoría.",
             ]);
         } catch (\Exception $e) {
             \Log::error("Error al rotar PDF: " . $e->getMessage(), ['exception' => $e]);
             return response()->json([
-                'ok' => false,
-                'mensaje' => 'Error al rotar el PDF: ' . $e->getMessage()
+                'ok'      => false,
+                'mensaje' => 'Error al rotar el PDF: ' . $e->getMessage(),
             ]);
         } finally {
             if (isset($tempOri) && file_exists($tempOri)) {

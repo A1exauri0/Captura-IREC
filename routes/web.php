@@ -187,6 +187,13 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/{id}', [CatalogoController::class, 'destroyLocalidad'])->name('destroy');
         });
 
+        Route::name('admin.catalogo_inconsistencias.')->prefix('catalogo-inconsistencias')->group(function () {
+            Route::get('/', [CatalogoController::class, 'catalogoInconsistencias'])->name('index');
+            Route::post('/', [CatalogoController::class, 'storeCatalogoInconsistencia'])->name('store');
+            Route::put('/{id}', [CatalogoController::class, 'updateCatalogoInconsistencia'])->name('update');
+            Route::delete('/{id}', [CatalogoController::class, 'destroyCatalogoInconsistencia'])->name('destroy');
+        });
+
         // Flujo Solo-BD + Stellum: Inconsistencias (R01-R09), Colisiones (revisar=1), Aprobación Masiva y Asignaciones
         Route::name('admin.inconsistencias.')->prefix('inconsistencias')->group(function () {
             Route::get('/', [FlujoStellumController::class, 'inconsistencias'])->name('index');
