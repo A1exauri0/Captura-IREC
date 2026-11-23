@@ -12,8 +12,13 @@ use App\Models\LoteCaptura;
 use App\Models\User;
 use App\Models\Municipios;
 use App\Models\Localidades;
+use App\Models\AsignacionCapturaUsuario;
+use App\Models\CatalogoInconsistencia;
 use App\Services\PdfService;
+use App\Services\RutaPropuestaService;
+use App\Services\StellumBridgeService;
 use App\Events\LoteActualizadoEvent;
+use App\Events\InconsistenciaReportadaEvent;
 
 class CapturaController extends Controller
 {
@@ -58,7 +63,23 @@ class CapturaController extends Controller
             }
         }
 
-        return view('operacion.estacion_captura', compact('anios', 'delegaciones', 'municipios', 'directoriosPorDefecto'));
+        $asignacionUsuario = AsignacionCapturaUsuario::with('delegacion')
+            ->where('user_id', Auth::id())
+            ->where('activo', true)
+            ->first();
+
+        $catalogoInconsistencias = CatalogoInconsistencia::where('activo', true)
+            ->orderBy('codigo')
+            ->get(['codigo', 'motivo_rechazo', 'accion_correctiva']);
+
+        return view('operacion.estacion_captura', compact(
+            'anios',
+            'delegaciones',
+            'municipios',
+            'directoriosPorDefecto',
+            'asignacionUsuario',
+            'catalogoInconsistencias'
+        ));
     }
 
     /**
@@ -398,136 +419,195 @@ class CapturaController extends Controller
     }
 
     // =========================================================
-    // RENOMBRAR ARCHIVO
+    // FLUJO SOLO-BD (NUNCA RENOMBRA NI MUEVE ARCHIVOS FÍSICOS)
     // =========================================================
 
     /**
-     * Renombra un PDF en el disco.
+     * Registra en BD la acción de captura (validado, renombrado, duplicar, inconsistencia),
+     * verifica colisiones en indice_archivos_pdfs (Stellum) y calcula ruta_propuesta.
      */
-    public function renombrar(Request $request)
+    private function registrarAccionSoloBd(Request $request, string $modo): \Illuminate\Http\JsonResponse
     {
-        $disco = $request->input('disco');
-        $rutaOriginal = $request->input('ruta_original');
-        $nuevoNombre = $request->input('nuevo_nombre');
+        $usuario = Auth::user();
+        $asignacion = AsignacionCapturaUsuario::where('user_id', $usuario?->id)->where('activo', true)->first();
 
-        $storage = Storage::disk($disco);
-        $rutaOriginalFisica = $storage->path($rutaOriginal);
-        $carpetaFisica = dirname($rutaOriginalFisica);
-        $rutaNuevaFisica = $carpetaFisica . DIRECTORY_SEPARATOR . $nuevoNombre . '.pdf';
-
-        if (!file_exists($rutaOriginalFisica)) {
-            return response()->json(['ok' => false, 'mensaje' => 'El archivo original no existe.']);
+        $tipoDocumento = strtolower((string) ($request->input('tipo_documento') ?: ($asignacion?->tipo_documento ?? 'registros')));
+        if (!in_array($tipoDocumento, ['registros', 'sellos', 'notarias', 'catastro'])) {
+            $tipoDocumento = 'registros';
         }
 
-        // Si ya existe un archivo con ese nombre en la misma carpeta, moverlo a Eliminados
-        if (file_exists($rutaNuevaFisica) && strtolower($rutaOriginalFisica) !== strtolower($rutaNuevaFisica)) {
-            $rutaEliminadosFisica = $storage->path('Eliminados');
-            if (!is_dir($rutaEliminadosFisica)) {
-                @mkdir($rutaEliminadosFisica, 0777, true);
-            }
-            $rutaDestinoEliminado = $rutaEliminadosFisica . DIRECTORY_SEPARATOR . $nuevoNombre . '.pdf';
-            if (file_exists($rutaDestinoEliminado)) {
-                @unlink($rutaDestinoEliminado);
-            }
-            @rename($rutaNuevaFisica, $rutaDestinoEliminado);
+        $rutaOrigen = (string) ($request->input('ruta_origen') ?: $request->input('ruta_original') ?: $request->input('ruta_archivo') ?: '');
+        $archivoOriginal = (string) ($request->input('archivo_original') ?: pathinfo($rutaOrigen, PATHINFO_FILENAME));
+        $archivoNuevo    = (string) ($request->input('nuevo_nombre') ?: $request->input('archivo_nuevo') ?: $archivoOriginal);
+        $archivoOriginalLimpio = preg_replace('/\.pdf$/i', '', trim($archivoOriginal));
+        $archivoNuevoLimpio    = preg_replace('/\.pdf$/i', '', trim($archivoNuevo));
+
+        // Determinar acción exacta
+        if ($modo === 'inconsistencia') {
+            $accion = 'inconsistencia';
+        } elseif ($modo === 'duplicar') {
+            $accion = 'duplicar';
+        } else {
+            $accion = strcasecmp($archivoOriginalLimpio, $archivoNuevoLimpio) === 0 ? 'validado' : 'renombrado';
         }
 
-        // Renombrar con función nativa
-        if (strtolower($rutaOriginalFisica) !== strtolower($rutaNuevaFisica)) {
-            if (!@rename($rutaOriginalFisica, $rutaNuevaFisica)) {
-                return response()->json(['ok' => false, 'mensaje' => 'Error al mover o renombrar el archivo en el servidor.']);
+        $delegacionId = $request->input('delegacion_id') ?: $asignacion?->delegacion_id;
+        $delegacionObj = $delegacionId ? Delegaciones::find($delegacionId) : null;
+        $delegacionNombre = $delegacionObj?->nombre ?? 'GENERAL';
+        $tipoSello = $request->input('tipo_sello') ?: $asignacion?->tipo_sello;
+        $lote = $request->input('nombre_lote') ?: $request->input('lote') ?: 'LOTE_GENERAL';
+        $directorio = $request->input('directorio') ?: $request->input('disco') ?: $delegacionNombre;
+        $indicePdfId = $request->input('indice_pdf_id') ? (int) $request->input('indice_pdf_id') : null;
+        $paginas = (int) $request->input('paginas', 1);
+
+        // Catálogo de inconsistencias (R01-R09)
+        $codigoInconsistencia = null;
+        $estadoInconsistencia = null;
+        $comentarioInconsistencia = null;
+        $detallesBase = (string) $request->input('detalles', '');
+
+        if ($accion === 'inconsistencia') {
+            $codigoInconsistencia = strtoupper(trim((string) $request->input('inconsistencia_codigo', 'R01')));
+            $catInc = CatalogoInconsistencia::where('codigo', $codigoInconsistencia)->first();
+            $estadoInconsistencia = 'pendiente';
+            $comentarioInconsistencia = trim((string) $request->input('inconsistencia_comentario', ''));
+            if ($catInc) {
+                $detallesBase = trim("{$catInc->codigo}: {$catInc->motivo_rechazo} | Acción: {$catInc->accion_correctiva}" . ($comentarioInconsistencia ? " | Nota: {$comentarioInconsistencia}" : ''));
             }
         }
 
-        $raizDisco = $storage->path('');
-        $rutaNuevaRelativa = str_replace('\\', '/', ltrim(str_replace($raizDisco, '', $rutaNuevaFisica), '\\/'));
+        // Verificar existencia en indice_archivos_pdfs (Stellum) para detectar colisión en entregables
+        $revisar = false;
+        $archivoColisionId = null;
+        $rutaColision = null;
+        $decisionRevision = null;
 
-        $totalPaginas = 0;
+        if ($archivoNuevoLimpio !== '') {
+            $bridge = app(StellumBridgeService::class);
+            $check = $bridge->verificarExistenciaEnEntregables($archivoNuevoLimpio, $tipoDocumento, $indicePdfId);
+            if (!empty($check['existe']) && !empty($check['coincidencia'])) {
+                $col = $check['coincidencia'];
+                $revisar = true;
+                $archivoColisionId = $col['id'] ?? null;
+                $rutaColision = $col['ruta'] ?? null;
+                $decisionRevision = 'pendiente';
+                $avisoColision = "El archivo ya se encuentra en los entregables (ID: {$archivoColisionId}, Ruta: {$rutaColision}).";
+                $detallesBase = trim($detallesBase . ' ' . $avisoColision);
+            }
+        }
+
+        // Calcular ruta_propuesta según config/reglas_destino_pdf.php
+        $rutaPropuesta = RutaPropuestaService::generar($tipoDocumento, [
+            'delegacion'            => $delegacionNombre,
+            'tipo_sello'            => $tipoSello ?: 'GENERAL',
+            'lote'                  => $lote,
+            'directorio'            => $directorio,
+            'inconsistencia_codigo' => $codigoInconsistencia,
+            'archivo_original'      => $archivoOriginalLimpio,
+            'archivo_nuevo'         => $archivoNuevoLimpio,
+        ], $accion);
+
+        $tabla = match ($tipoDocumento) {
+            'sellos'   => 'auditoria_sellos',
+            'notarias' => 'auditoria_notarias',
+            'catastro' => 'auditoria_catastro',
+            default    => 'auditoria_registros',
+        };
+
+        $registro = [
+            'fecha_hora'                => now()->format('Y-m-d H:i:s'),
+            'turno'                     => $usuario?->turnoRelacion?->nombre ?? $usuario?->turno ?? 'Matutino',
+            'user_id'                   => $usuario?->id,
+            'categoria'                 => 'Captura',
+            'pc'                        => $request->ip(),
+            'directorio'                => $directorio,
+            'lote'                      => $lote,
+            'accion'                    => $accion,
+            'archivo_original'          => $archivoOriginalLimpio,
+            'archivo_nuevo'             => $archivoNuevoLimpio,
+            'ruta'                      => $rutaOrigen,
+            'ruta_origen'               => $rutaOrigen,
+            'ruta_propuesta'            => $rutaPropuesta,
+            'ruta_destino'              => $rutaPropuesta,
+            'indice_pdf_id'             => $indicePdfId,
+            'revisar'                   => $revisar,
+            'archivo_colision_id'       => $archivoColisionId,
+            'ruta_colision'             => $rutaColision,
+            'decision_revision'         => $decisionRevision,
+            'inconsistencia_codigo'     => $codigoInconsistencia,
+            'inconsistencia_estado'     => $estadoInconsistencia,
+            'inconsistencia_comentario' => $comentarioInconsistencia,
+            'estado_aplicacion'         => 'pendiente',
+            'detalles'                  => $detallesBase ?: null,
+            'paginas'                   => $paginas,
+            'created_at'                => now(),
+            'updated_at'                => now(),
+        ];
+
+        if (in_array($tipoDocumento, ['registros', 'sellos'])) {
+            $registro['delegacion_id'] = $delegacionId;
+        }
+        if ($tipoDocumento === 'sellos') {
+            $registro['tipo_sello'] = $tipoSello;
+        }
+
+        $auditoriaId = DB::table($tabla)->insertGetId($registro);
+
+        // Si es inconsistencia, notificar en tiempo real a la campana del navbar del administrador
+        if ($accion === 'inconsistencia') {
+            try {
+                broadcast(new InconsistenciaReportadaEvent([
+                    'id'                    => $auditoriaId,
+                    'tipo_documento'        => $tipoDocumento,
+                    'capturista'            => $usuario?->name ?? 'Capturista',
+                    'inconsistencia_codigo' => $codigoInconsistencia,
+                    'archivo_original'      => $archivoOriginalLimpio,
+                    'lote'                  => $lote,
+                    'detalles'              => $detallesBase,
+                ]));
+            } catch (\Throwable $e) {
+                // Continuar aunque Reverb no esté corriendo
+            }
+        }
 
         return response()->json([
-            'ok' => true,
-            'ruta_nueva' => $rutaNuevaRelativa,
-            'paginas' => $totalPaginas,
-            'mensaje' => 'Archivo renombrado correctamente.',
+            'ok'             => true,
+            'solo_bd'        => true,
+            'auditoria_id'   => $auditoriaId,
+            'accion'         => $accion,
+            'revisar'        => $revisar,
+            'ruta_origen'    => $rutaOrigen,
+            'ruta_propuesta' => $rutaPropuesta,
+            'ruta_nueva'     => $rutaOrigen,
+            'paginas'        => $paginas,
+            'mensaje'        => $revisar
+                ? "Registrado en BD ({$accion}). ATENCIÓN: El archivo ya existe en entregables y se marcó para revisión."
+                : "Acción '{$accion}' registrada únicamente en BD (sin modificar archivo físico).",
         ]);
     }
 
-    // =========================================================
-    // VALIDAR (mover a Calidad — nombre ya correcto)
-    // =========================================================
+    public function renombrar(Request $request)
+    {
+        return $this->registrarAccionSoloBd($request, 'auto');
+    }
 
-    /**
-     * Mueve un PDF a la carpeta de Calidad.
-     * Estructura destino: Calidad/{delegacion}/{año}/{lote}/{archivo}.pdf
-     */
     public function validar(Request $request)
     {
-        $disco = $request->input('disco');
-        $rutaArchivo = $request->input('ruta_archivo');
-        $delegacionId = $request->input('delegacion_id');
-        $nombreLote = $request->input('nombre_lote');
+        return $this->registrarAccionSoloBd($request, 'auto');
+    }
 
-        $storage = Storage::disk($disco);
-        $delegacion = Delegaciones::find($delegacionId);
+    public function duplicar(Request $request)
+    {
+        return $this->registrarAccionSoloBd($request, 'duplicar');
+    }
 
-        $rutaArchivoFisica = $storage->path($rutaArchivo);
-
-        if (!file_exists($rutaArchivoFisica)) {
-            return response()->json(['ok' => false, 'mensaje' => 'El archivo no existe.']);
-        }
-
-        $nombreArchivo = basename($rutaArchivo);
-        $nombreSinExt = pathinfo($nombreArchivo, PATHINFO_FILENAME);
-
-        // Detectar año del nombre del archivo para organizar en subcarpetas
-        $anioDetectado = $this->detectarAnioDelNombre($nombreSinExt);
-
-        // Construir ruta destino física
-        $rutaDestinoRelativa = 'Calidad/' . $delegacion->nombre;
-        if ($anioDetectado) {
-            $rutaDestinoRelativa .= '/' . $anioDetectado;
-        }
-        $rutaDestinoRelativa .= '/' . $nombreLote;
-
-        $rutaDestinoFisica = $storage->path($rutaDestinoRelativa);
-        if (!is_dir($rutaDestinoFisica)) {
-            @mkdir($rutaDestinoFisica, 0777, true);
-        }
-
-        $archivoDestinoFisico = $rutaDestinoFisica . DIRECTORY_SEPARATOR . $nombreArchivo;
-
-        // Si ya existe en destino, mover el existente a Eliminados
-        if (file_exists($archivoDestinoFisico)) {
-            $rutaEliminadosFisica = $storage->path('Eliminados');
-            if (!is_dir($rutaEliminadosFisica)) {
-                @mkdir($rutaEliminadosFisica, 0777, true);
-            }
-            $rutaDestinoEliminado = $rutaEliminadosFisica . DIRECTORY_SEPARATOR . $nombreArchivo;
-            if (file_exists($rutaDestinoEliminado)) {
-                @unlink($rutaDestinoEliminado);
-            }
-            @rename($archivoDestinoFisico, $rutaDestinoEliminado);
-        }
-
-        // Mover archivo a Calidad usando rename() nativo
-        if (!@rename($rutaArchivoFisica, $archivoDestinoFisico)) {
-            return response()->json(['ok' => false, 'mensaje' => 'Error al mover el archivo a Calidad.']);
-        }
-
-        // Contar páginas solo al validar (aquí sí se necesita)
-        $archivoDestinoRelativo = $rutaDestinoRelativa . '/' . $nombreArchivo;
-        $totalPaginas = $this->contarPaginasPdf($disco, $archivoDestinoRelativo);
-
-        return response()->json([
-            'ok' => true,
-            'paginas' => $totalPaginas,
-            'mensaje' => 'Archivo movido a Calidad correctamente.',
-        ]);
+    public function inconsistencia(Request $request)
+    {
+        return $this->registrarAccionSoloBd($request, 'inconsistencia');
     }
 
     /**
      * Detecta el año del nombre del archivo (segunda parte separada por _).
-     * Retorna el año como string o null si no es un año válido.
      */
     private function detectarAnioDelNombre(string $nombre): ?string
     {
@@ -539,183 +619,6 @@ class CapturaController extends Controller
             }
         }
         return null;
-    }
-
-    // =========================================================
-    // DUPLICAR (copiar a Calidad con nuevo nombre)
-    // =========================================================
-
-    /**
-     * Copia un PDF a la carpeta de Calidad con un nombre diferente.
-     * El original permanece en el lote para poder ser renombrado después.
-     */
-    public function duplicar(Request $request)
-    {
-        $disco = $request->input('disco');
-        $rutaOriginal = $request->input('ruta_original');
-        $nuevoNombre = $request->input('nuevo_nombre');
-        $delegacionId = $request->input('delegacion_id');
-        $nombreLote = $request->input('nombre_lote');
-
-        $storage = Storage::disk($disco);
-        $delegacion = Delegaciones::find($delegacionId);
-
-        $rutaOriginalFisica = $storage->path($rutaOriginal);
-
-        if (!file_exists($rutaOriginalFisica)) {
-            return response()->json(['ok' => false, 'mensaje' => 'El archivo original no existe.']);
-        }
-
-        $anioDetectado = $this->detectarAnioDelNombre($nuevoNombre);
-
-        $rutaDestinoRelativa = 'Calidad/' . $delegacion->nombre;
-        if ($anioDetectado) {
-            $rutaDestinoRelativa .= '/' . $anioDetectado;
-        }
-        $rutaDestinoRelativa .= '/' . $nombreLote;
-
-        $rutaDestinoFisica = $storage->path($rutaDestinoRelativa);
-        if (!is_dir($rutaDestinoFisica)) {
-            @mkdir($rutaDestinoFisica, 0777, true);
-        }
-
-        $archivoDestinoFisico = $rutaDestinoFisica . DIRECTORY_SEPARATOR . $nuevoNombre . '.pdf';
-
-        // Si ya existe en destino, es un duplicado confirmado
-        if (file_exists($archivoDestinoFisico)) {
-            $archivoDestinoRelativo = $rutaDestinoRelativa . '/' . $nuevoNombre . '.pdf';
-            $totalPaginas = $this->contarPaginasPdf($disco, $archivoDestinoRelativo);
-            return response()->json([
-                'ok' => true,
-                'duplicado_existente' => true,
-                'paginas' => $totalPaginas,
-                'mensaje' => 'El folio ya existe en Calidad.',
-            ]);
-        }
-
-        // Copiar archivo usando copy() nativo (rápido)
-        if (!@copy($rutaOriginalFisica, $archivoDestinoFisico)) {
-            return response()->json(['ok' => false, 'mensaje' => 'Error al duplicar el archivo.']);
-        }
-
-        $archivoDestinoRelativo = $rutaDestinoRelativa . '/' . $nuevoNombre . '.pdf';
-        $totalPaginas = $this->contarPaginasPdf($disco, $archivoDestinoRelativo);
-
-        return response()->json([
-            'ok' => true,
-            'paginas' => $totalPaginas,
-            'mensaje' => 'Archivo duplicado correctamente.',
-        ]);
-    }
-
-    // =========================================================
-    // INCONSISTENCIA (mover a Inconsistencias)
-    // =========================================================
-
-    /**
-     * Mueve un archivo a la carpeta raíz de Inconsistencias.
-     */
-    public function inconsistencia(Request $request)
-    {
-        $disco = $request->input('disco');
-        $rutaArchivo = $request->input('ruta_archivo');
-
-        $storage = Storage::disk($disco);
-        $rutaArchivoFisica = $storage->path($rutaArchivo);
-
-        if (!file_exists($rutaArchivoFisica)) {
-            return response()->json(['ok' => false, 'mensaje' => 'El archivo no existe.']);
-        }
-
-        $nombreArchivo = basename($rutaArchivo);
-
-        $rutaInconsistenciasFisica = $storage->path('Inconsistencias');
-        if (!is_dir($rutaInconsistenciasFisica)) {
-            @mkdir($rutaInconsistenciasFisica, 0777, true);
-        }
-
-        $destinoFisico = $rutaInconsistenciasFisica . DIRECTORY_SEPARATOR . $nombreArchivo;
-
-        // Si ya existe, agregar timestamp para evitar colisión
-        if (file_exists($destinoFisico)) {
-            $sinExt = pathinfo($nombreArchivo, PATHINFO_FILENAME);
-            $destinoFisico = $rutaInconsistenciasFisica . DIRECTORY_SEPARATOR . $sinExt . '_' . time() . '.pdf';
-        }
-
-        if (!@rename($rutaArchivoFisica, $destinoFisico)) {
-            return response()->json(['ok' => false, 'mensaje' => 'Error al mover el archivo a Inconsistencias.']);
-        }
-
-        $raizDisco = $storage->path('');
-        $destinoRelativo = str_replace('\\', '/', ltrim(str_replace($raizDisco, '', $destinoFisico), '\\/'));
-        $totalPaginas = $this->contarPaginasPdf($disco, $destinoRelativo);
-
-        return response()->json([
-            'ok' => true,
-            'paginas' => $totalPaginas,
-            'mensaje' => 'Archivo movido a Inconsistencias.'
-        ]);
-    }
-
-    // =========================================================
-    // MOVER A SELLOS (Inconsistencias/Sellos/Lote N)
-    // =========================================================
-
-    /**
-     * Mueve un archivo a Inconsistencias/Sellos, distribuyendo
-     * en subcarpetas de máximo 400 archivos (igual que VB.NET).
-     */
-    public function moverSellos(Request $request)
-    {
-        $disco = $request->input('disco');
-        $rutaArchivo = $request->input('ruta_archivo');
-
-        $storage = Storage::disk($disco);
-        $rutaArchivoFisica = $storage->path($rutaArchivo);
-
-        if (!file_exists($rutaArchivoFisica)) {
-            return response()->json(['ok' => false, 'mensaje' => 'El archivo no existe.']);
-        }
-
-        // Buscar o crear lote de Sellos con menos de 400 archivos usando rutas físicas
-        $rutaBaseSellosFisica = $storage->path('Inconsistencias/Sellos');
-        if (!is_dir($rutaBaseSellosFisica)) {
-            @mkdir($rutaBaseSellosFisica, 0777, true);
-        }
-
-        $numeroLote = 1;
-        $rutaLoteSellosFisica = '';
-
-        while ($numeroLote <= 10000) {
-            $rutaLoteSellosFisica = $rutaBaseSellosFisica . DIRECTORY_SEPARATOR . 'Lote ' . $numeroLote;
-            if (!is_dir($rutaLoteSellosFisica)) {
-                @mkdir($rutaLoteSellosFisica, 0777, true);
-                break; // Carpeta nueva creada, la usamos
-            }
-            // Contar archivos usando glob rápido
-            $archivosEnLote = glob($rutaLoteSellosFisica . DIRECTORY_SEPARATOR . '*');
-            if (count($archivosEnLote) < 400) {
-                break; // Tiene espacio
-            }
-            $numeroLote++;
-        }
-
-        $nombreArchivo = basename($rutaArchivo);
-        $destinoFisico = $rutaLoteSellosFisica . DIRECTORY_SEPARATOR . $nombreArchivo;
-
-        if (!@rename($rutaArchivoFisica, $destinoFisico)) {
-            return response()->json(['ok' => false, 'mensaje' => 'Error al mover el archivo a Sellos.']);
-        }
-
-        $raizDisco = $storage->path('');
-        $destinoRelativo = str_replace('\\', '/', ltrim(str_replace($raizDisco, '', $destinoFisico), '\\/'));
-        $totalPaginas = $this->contarPaginasPdf($disco, $destinoRelativo);
-
-        return response()->json([
-            'ok' => true,
-            'paginas' => $totalPaginas,
-            'mensaje' => 'Archivo movido a Sellos.'
-        ]);
     }
 
     // =========================================================

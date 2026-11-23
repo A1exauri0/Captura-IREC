@@ -10,6 +10,7 @@ use App\Http\Controllers\TurnoController;
 use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\PeticionAutorizacionController;
 use App\Http\Controllers\AccesoController;
+use App\Http\Controllers\FlujoStellumController;
 
 // =========================================================================
 // AUTENTICACIÓN
@@ -43,7 +44,6 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/validar', [CapturaController::class, 'validar'])->name('validar');
             Route::post('/duplicar', [CapturaController::class, 'duplicar'])->name('duplicar');
             Route::post('/inconsistencia', [CapturaController::class, 'inconsistencia'])->name('inconsistencia');
-            Route::post('/mover-sellos', [CapturaController::class, 'moverSellos'])->name('moverSellos');
             Route::post('/rotar', [CapturaController::class, 'rotar'])->name('rotar');
             Route::post('/liberar-lote', [CapturaController::class, 'liberarLote'])->name('liberarLote');
             Route::post('/auditoria', [CapturaController::class, 'auditoria'])->name('auditoria');
@@ -184,6 +184,29 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [CatalogoController::class, 'storeLocalidad'])->name('store');
             Route::put('/{id}', [CatalogoController::class, 'updateLocalidad'])->name('update');
             Route::delete('/{id}', [CatalogoController::class, 'destroyLocalidad'])->name('destroy');
+        });
+
+        // Flujo Solo-BD + Stellum: Inconsistencias (R01-R09), Colisiones (revisar=1), Aprobación Masiva y Asignaciones
+        Route::name('admin.inconsistencias.')->prefix('inconsistencias')->group(function () {
+            Route::get('/', [FlujoStellumController::class, 'inconsistencias'])->name('index');
+            Route::post('/{tipo}/{id}', [FlujoStellumController::class, 'actualizarInconsistencia'])->name('actualizar');
+        });
+
+        Route::name('admin.colisiones.')->prefix('colisiones')->group(function () {
+            Route::get('/', [FlujoStellumController::class, 'colisiones'])->name('index');
+            Route::post('/{tipo}/{id}', [FlujoStellumController::class, 'resolverColision'])->name('resolver');
+        });
+
+        Route::name('admin.aprobacion.')->prefix('aprobacion-renombres')->group(function () {
+            Route::get('/', [FlujoStellumController::class, 'aprobacionRenombres'])->name('index');
+            Route::post('/enviar', [FlujoStellumController::class, 'aprobarYEnviar'])->name('enviar');
+            Route::get('/orden/{id}/sincronizar', [FlujoStellumController::class, 'sincronizarOrden'])->name('sincronizar');
+        });
+
+        Route::name('admin.asignaciones.')->prefix('asignaciones')->group(function () {
+            Route::get('/', [FlujoStellumController::class, 'asignaciones'])->name('index');
+            Route::post('/', [FlujoStellumController::class, 'guardarAsignacion'])->name('guardar');
+            Route::delete('/{id}', [FlujoStellumController::class, 'eliminarAsignacion'])->name('eliminar');
         });
     });
 });

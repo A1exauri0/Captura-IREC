@@ -1,5 +1,18 @@
 @php
     $pendientesAuthCount = \App\Models\PeticionAutorizacion::where('estado', 'pendiente')->count();
+    $pendientesIncCount = 0;
+    try {
+        foreach (['auditoria_registros', 'auditoria_sellos', 'auditoria_notarias', 'auditoria_catastro'] as $tblInc) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn($tblInc, 'inconsistencia_codigo')) {
+                $pendientesIncCount += \Illuminate\Support\Facades\DB::table($tblInc)
+                    ->whereNotNull('inconsistencia_codigo')
+                    ->where(function ($q) {
+                        $q->whereNull('inconsistencia_estado')->orWhere('inconsistencia_estado', 'pendiente');
+                    })->count();
+            }
+        }
+    } catch (\Throwable $e) {}
+    $pendientesAuthCount += $pendientesIncCount;
     $notificacionesRecientes = \App\Models\PeticionAutorizacion::with('solicitante:id,name,user')
         ->orderByRaw("CASE WHEN estado = 'pendiente' THEN 0 ELSE 1 END")
         ->orderByDesc('id')
@@ -93,9 +106,12 @@
                     @endforelse
                 </div>
 
-                <div class="px-3 py-2 bg-slate-50 border-top text-center">
+                <div class="px-3 py-2 bg-slate-50 border-top d-flex justify-content-between">
                     <a href="{{ route('admin.autorizaciones.index') }}" class="text-xs font-weight-bold text-sky-700 text-decoration-none">
-                        Ver centro de autorizaciones <i class="fa-solid fa-arrow-right ml-1"></i>
+                        Autorizaciones
+                    </a>
+                    <a href="{{ route('admin.inconsistencias.index') }}" class="text-xs font-weight-bold text-amber-700 text-decoration-none">
+                        Inconsistencias ({{ $pendientesIncCount }}) <i class="fa-solid fa-arrow-right ml-1"></i>
                     </a>
                 </div>
             </div>
@@ -193,6 +209,29 @@
                                     }
                                 });
                             }
+                        }
+                    })
+                    .listen('.inconsistencia.reportada', function (e) {
+                        const inc = e.inconsistencia || {};
+                        agregarNotificacionNavbar({
+                            capturista: inc.capturista || 'Capturista',
+                            tipo_peticion: 'Inconsistencia ' + (inc.inconsistencia_codigo || ''),
+                            archivo_nombre: inc.archivo_original || inc.lote || 'Archivo'
+                        });
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                toast: true,
+                                position: 'top-end',
+                                icon: 'warning',
+                                title: `Inconsistencia ${inc.inconsistencia_codigo || ''} reportada por ${inc.capturista || 'Capturista'}`,
+                                showConfirmButton: true,
+                                confirmButtonText: 'Revisar',
+                                timer: 7000
+                            }).then((r) => {
+                                if (r.isConfirmed) {
+                                    window.location.href = "{{ route('admin.inconsistencias.index') }}";
+                                }
+                            });
                         }
                     });
             } catch (err) {}

@@ -90,13 +90,8 @@
                     </button>
                 </div>
 
-                <!-- Fila 2: Mover, Pantalla, Oscuro, Refrescar, Config, Cerrar -->
+                <!-- Fila 2: Pantalla, Oscuro (Botón Mover eliminado por flujo Solo-BD) -->
                 <div class="flex items-center gap-2">
-                    <button id="btnMover"
-                        class="px-5 py-1.5 text-lg bg-[#87cefa] hover:bg-blue-400 text-black rounded border border-blue-400 transition-colors flex items-center justify-center gap-2 shadow-sm w-[130px]">
-                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Mover
-                    </button>
-
                     <button id="btnPantallaCompleta"
                         class="px-4 py-1.5 text-lg bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm flex items-center gap-2">
                         <i class="fa-solid fa-expand"></i> Pantalla
@@ -1000,17 +995,103 @@
             }
         });
 
-        // Búsqueda completamente automática de lote al abrir la página (sin modal de selección)
+        // Búsqueda completamente automática de lote al abrir la página (auto-selección de regla por asignación de usuario)
+        const ASIGNACION_USUARIO = @json($asignacionUsuario ?? null);
+        const CATALOGO_INCONSISTENCIAS = @json($catalogoInconsistencias ?? []);
+
         window.addEventListener('DOMContentLoaded', () => {
             const ultimoDirId = localStorage.getItem('val_ultimo_directorio_id');
             const ultimaDelId = localStorage.getItem('val_ultima_delegacion_id');
 
-            const dir = directoriosConfig.find(d => d.id === ultimoDirId) || directoriosConfig[0] || { id: 'irec', nombre: 'IREC', ruta: '\\\\172.40.5.84\\irec', reglas: ['Regla1'] };
-            const del = catalogoDelegaciones.find(d => String(d.id) === String(ultimaDelId)) || null;
+            let dir = directoriosConfig.find(d => d.id === ultimoDirId) || directoriosConfig[0] || { id: 'irec', nombre: 'IREC', ruta: '\\\\172.40.5.84\\irec', reglas: ['Regla1'] };
+            let del = catalogoDelegaciones.find(d => String(d.id) === String(ultimaDelId)) || null;
+
+            // Auto-seleccionar tipo de archivo, regla y delegación desde asignaciones_captura_usuario
+            if (ASIGNACION_USUARIO) {
+                const tipoAsig = String(ASIGNACION_USUARIO.tipo_documento || '').toUpperCase();
+                const dirAsig = directoriosConfig.find(d => String(d.tipo || '').toUpperCase() === tipoAsig);
+                if (dirAsig) {
+                    dir = dirAsig;
+                }
+                if (ASIGNACION_USUARIO.delegacion_id) {
+                    const delAsig = catalogoDelegaciones.find(d => String(d.id) === String(ASIGNACION_USUARIO.delegacion_id));
+                    if (delAsig) del = delAsig;
+                }
+            }
 
             dirSeleccionado = dir;
             delSeleccionada = del;
             aplicarReglasDeDirectorio(dir);
+
+            // Forzar selección automática de regla según tabla de asignaciones
+            if (ASIGNACION_USUARIO && ASIGNACION_USUARIO.regla_automatica) {
+                const rb1 = document.getElementById('rbRegla1');
+                const rb2 = document.getElementById('rbRegla2');
+                if (ASIGNACION_USUARIO.regla_automatica === 'Regla2' && rb2) {
+                    rb2.checked = true;
+                    if (rb1) rb1.checked = false;
+                } else if (rb1) {
+                    rb1.checked = true;
+                    if (rb2) rb2.checked = false;
+                }
+            }
+
+            // Interceptar botón Inconsistencia para usar el catálogo R01-R09
+            const btnInc = document.getElementById('btnInconsistencia');
+            const modalInc = document.getElementById('modalInconsistenciaCatalogo');
+            if (btnInc && modalInc) {
+                const btnClon = btnInc.cloneNode(true);
+                btnInc.parentNode.replaceChild(btnClon, btnInc);
+                btnClon.addEventListener('click', () => {
+                    modalInc.classList.remove('hidden');
+                });
+            }
+
+            const selInc = document.getElementById('selectCodigoInconsistencia');
+            const lblAccion = document.getElementById('lblAccionCorrectivaInc');
+            if (selInc && lblAccion) {
+                const actualizarInfoInc = () => {
+                    const item = CATALOGO_INCONSISTENCIAS.find(c => c.codigo === selInc.value);
+                    lblAccion.textContent = item ? `Acción correctiva: ${item.accion_correctiva}` : '';
+                };
+                selInc.addEventListener('change', actualizarInfoInc);
+                actualizarInfoInc();
+            }
+
+            document.getElementById('btnCancelarIncCatalogo')?.addEventListener('click', () => {
+                modalInc?.classList.add('hidden');
+            });
+
+            document.getElementById('btnConfirmarIncCatalogo')?.addEventListener('click', async () => {
+                const codigo = document.getElementById('selectCodigoInconsistencia')?.value || 'R01';
+                const nota = document.getElementById('txtNotaInconsistencia')?.value || '';
+                const pdfActual = (typeof ctx !== 'undefined' && ctx.listaPdfs && ctx.listaPdfs[ctx.indiceActual]) ? ctx.listaPdfs[ctx.indiceActual] : null;
+                try {
+                    const resp = await fetch("{{ route('admin.captura.inconsistencia') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({
+                            tipo_documento: ASIGNACION_USUARIO?.tipo_documento || 'registros',
+                            delegacion_id: delSeleccionada?.id || null,
+                            lote: (typeof ctx !== 'undefined' && ctx.loteActualNombre) ? ctx.loteActualNombre : 'LOTE',
+                            ruta_origen: pdfActual?.ruta || '',
+                            archivo_original: pdfActual?.nombre || '',
+                            inconsistencia_codigo: codigo,
+                            inconsistencia_comentario: nota,
+                        })
+                    });
+                    const data = await resp.json();
+                    modalInc?.classList.add('hidden');
+                    if (data.ok && typeof CapturaProcesos !== 'undefined' && typeof ctx !== 'undefined') {
+                        CapturaProcesos.avanzarSiguiente?.(ctx);
+                    }
+                } catch (err) {
+                    console.error('Error reportando inconsistencia:', err);
+                }
+            });
 
             // Iniciar búsqueda automática de lote inmediatamente
             lblTotalPdf.innerText = del ? `${del.nombre} - Buscando lote automático...` : 'Buscando lote libre...';
@@ -1028,6 +1109,38 @@
             });
         });
     </script>
+
+    <!-- Modal Catálogo de Inconsistencias (R01-R09) -->
+    <div id="modalInconsistenciaCatalogo" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl shadow-2xl w-[92%] max-w-[480px] p-6 border border-gray-300 dark:border-gray-700">
+            <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500 text-2xl"></i>
+                <div>
+                    <h3 class="font-bold text-lg leading-tight">Reportar Inconsistencia</h3>
+                    <span class="text-xs text-gray-500">Notifica al administrador en tiempo real (solo BD)</span>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold uppercase text-gray-600 dark:text-gray-300 mb-1">Código y Motivo de Rechazo</label>
+                <select id="selectCodigoInconsistencia" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">
+                    @foreach(($catalogoInconsistencias ?? []) as $inc)
+                        <option value="{{ $inc->codigo }}">{{ $inc->codigo }} — {{ $inc->motivo_rechazo }}</option>
+                    @endforeach
+                </select>
+                <p id="lblAccionCorrectivaInc" class="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1.5"></p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-bold uppercase text-gray-600 dark:text-gray-300 mb-1">Observaciones adicionales (opcional)</label>
+                <textarea id="txtNotaInconsistencia" rows="2" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded" placeholder="Detalle adicional para el supervisor..."></textarea>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" id="btnCancelarIncCatalogo" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 rounded font-semibold text-sm">Cancelar</button>
+                <button type="button" id="btnConfirmarIncCatalogo" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded text-sm">
+                    <i class="fa-solid fa-paper-plane mr-1"></i> Enviar Inconsistencia
+                </button>
+            </div>
+        </div>
+    </div>
     <!-- PWA Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {

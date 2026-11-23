@@ -34,6 +34,16 @@
                 "icon": "fa-solid fa-magnifying-glass",
                 "route": "admin.analytics_sellos.reportes.buscar_archivos",
                 "active_routes": ["admin.analytics_sellos.reportes.buscar_archivos"]
+            },
+            {
+                "id": "submenu-supervision",
+                "label": "Supervisión & Stellum",
+                "icon": "fa-solid fa-list-check",
+                "children": [
+                    { "label": "Inconsistencias (R01-R09)", "icon": "fa-solid fa-triangle-exclamation", "route": "admin.inconsistencias.index" },
+                    { "label": "Colisiones / Revisar", "icon": "fa-solid fa-code-compare", "route": "admin.colisiones.index" },
+                    { "label": "Aprobación de Renombres", "icon": "fa-solid fa-check-double", "route": "admin.aprobacion.index" }
+                ]
             }
         ]
     },
@@ -93,6 +103,12 @@
                 "icon": "fa-solid fa-user-clock",
                 "route": "admin.turnos.index",
                 "active_routes": ["admin.turnos.*"]
+            },
+            {
+                "label": "Asignación de Captura",
+                "icon": "fa-solid fa-user-tag",
+                "route": "admin.asignaciones.index",
+                "active_routes": ["admin.asignaciones.*"]
             },
             {
                 "id": "submenu-catalogos",

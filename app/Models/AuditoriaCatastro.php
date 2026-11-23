@@ -25,7 +25,18 @@ class AuditoriaCatastro extends Model
         'archivo_nuevo',
         'ruta',
         'ruta_origen',
+        'ruta_propuesta',
         'ruta_destino',
+        'indice_pdf_id',
+        'revisar',
+        'archivo_colision_id',
+        'ruta_colision',
+        'decision_revision',
+        'inconsistencia_codigo',
+        'inconsistencia_estado',
+        'inconsistencia_comentario',
+        'estado_aplicacion',
+        'orden_aplicacion_id',
         'hash',
         'archivo_danado',
         'detalles',
@@ -35,7 +46,8 @@ class AuditoriaCatastro extends Model
 
     protected $casts = [
         'archivo_danado' => 'boolean',
-        'paginas' => 'integer',
+        'revisar'        => 'boolean',
+        'paginas'        => 'integer',
     ];
 
     public function usuario()
