@@ -62,7 +62,6 @@ class CapturaController extends Controller
                     'tipo'    => strtoupper($tipo),
                     'entrega' => $r['entrega'] ?? '',
                     'nombre'  => '[' . strtoupper($tipo) . '] ' . $r['nombre'],
-                    'ruta'    => $r['ruta'],
                     'reglas'  => $reglas,
                 ];
             }

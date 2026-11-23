@@ -11,8 +11,8 @@
 <body class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
         <div class="bg-gradient-to-r from-slate-900 to-sky-900 p-6 text-center text-white">
-            <div class="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center mx-auto mb-3">
-                <i class="fa-solid fa-file-shield text-2xl text-sky-300"></i>
+            <div class="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto mb-3 shadow">
+                <img src="{{ asset('img/favicon.png') }}" alt="Captura IREC" class="w-full h-full object-contain">
             </div>
             <h1 class="text-2xl font-bold tracking-tight">Digitalización Chiapas 2026</h1>
             <p class="text-xs text-sky-200 mt-1">Sistema de Captura, Validación y Trazabilidad Documental</p>

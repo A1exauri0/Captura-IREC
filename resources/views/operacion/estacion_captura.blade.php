@@ -46,12 +46,12 @@
             <!-- Input maestro oculto para compatibilidad con CapturaReglas / CapturaProcesos -->
             <input type="text" id="txtNombre" autocomplete="off" class="hidden">
 
-            <!-- FILA 1: Estado, Preview compacto y Utilidades (Rotación, Oscuro, Config, Salir) -->
+            <!-- FILA 1: Estado, Preview compacto y Utilidades (Sin botón Config ni rutas visibles) -->
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3 min-w-0">
-                    <span class="text-sm font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Delegación - Lote</span>
+                    <span class="text-sm font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Cargando lote...</span>
                     <span class="px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-xs font-bold" id="lblCaptura">Primera captura</span>
-                    <code id="lblPreviewNombreSellos" class="px-2.5 py-0.5 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-xs font-mono font-bold text-gray-800 dark:text-gray-100">01_00_00_00_00_00_2024_0001_00</code>
+                    <code id="lblPreviewNombreSellos" class="px-2.5 py-0.5 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-xs font-mono font-bold text-gray-800 dark:text-gray-100">—</code>
                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300" id="lblEstado">Listo para capturar</span>
                 </div>
 
@@ -80,20 +80,6 @@
                         class="w-8 h-8 flex items-center justify-center bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 text-xs">
                         <i class="fa-solid fa-sync"></i>
                     </button>
-                    <div class="relative">
-                        <button id="btnConfig" title="Configuración"
-                            class="w-8 h-8 flex items-center justify-center bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 text-xs">
-                            <i class="fa-solid fa-gear"></i>
-                        </button>
-                        <div id="dropdownConfig"
-                            class="absolute right-0 bottom-10 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 hidden z-50">
-                            <button id="btnOptSesion"
-                                class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center">
-                                <i class="fa-solid fa-folder-tree mr-2 text-amber-500 w-4"></i> Seleccionar Directorio
-                            </button>
-                            <button id="btnOptReglas" class="hidden"></button>
-                        </div>
-                    </div>
                     <button id="btnCerrarSesion"
                         class="h-8 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded border border-red-800 flex items-center gap-1.5">
                         <i class="fa-solid fa-power-off"></i> Salir
@@ -101,52 +87,52 @@
                 </div>
             </div>
 
-            <!-- FILA 2: Solo los 9 Inputs de Captura (pasando de input en input) + Acciones -->
+            <!-- FILA 2: Solo los 9 Inputs de Captura (vacíos, pasando de input en input) + Acciones -->
             <div class="flex flex-wrap lg:flex-nowrap items-end gap-3">
                 <div class="grid grid-cols-9 gap-2 flex-1 bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 shadow-sm">
                     <div>
                         <label for="selloDel" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">1. Del.</label>
-                        <input type="text" id="selloDel" data-auto-next="2" maxlength="2" value="01" autocomplete="off"
+                        <input type="text" id="selloDel" data-auto-next="2" maxlength="2" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloSecc" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">2. Secc.</label>
-                        <input type="text" id="selloSecc" data-auto-next="2" maxlength="2" value="00" autocomplete="off"
+                        <input type="text" id="selloSecc" data-auto-next="2" maxlength="2" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloLibro" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">3. Libro</label>
-                        <input type="text" id="selloLibro" data-auto-next="2" maxlength="2" value="00" autocomplete="off"
+                        <input type="text" id="selloLibro" data-auto-next="2" maxlength="2" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloTomo" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">4. Tomo</label>
-                        <input type="text" id="selloTomo" maxlength="10" value="00" autocomplete="off"
+                        <input type="text" id="selloTomo" maxlength="10" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloVol" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">5. Vol.</label>
-                        <input type="text" id="selloVol" data-auto-next="2" maxlength="2" value="00" autocomplete="off"
+                        <input type="text" id="selloVol" data-auto-next="2" maxlength="2" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloFracc" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">6. Fracc.</label>
-                        <input type="text" id="selloFracc" maxlength="12" value="00" autocomplete="off"
+                        <input type="text" id="selloFracc" maxlength="12" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloAnio" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">7. Año</label>
-                        <input type="text" id="selloAnio" data-auto-next="4" maxlength="4" value="2024" autocomplete="off"
+                        <input type="text" id="selloAnio" data-auto-next="4" maxlength="4" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloInscr" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">8. Inscr.</label>
-                        <input type="text" id="selloInscr" maxlength="6" value="0001" autocomplete="off"
+                        <input type="text" id="selloInscr" maxlength="6" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloBis" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">9. Bis</label>
-                        <input type="text" id="selloBis" maxlength="2" value="00" autocomplete="off"
+                        <input type="text" id="selloBis" maxlength="2" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                 </div>
@@ -811,26 +797,23 @@
         const btnOptReglas = document.getElementById('btnOptReglas');
         const panelReglas = document.getElementById('panelReglas');
 
-        // Toggle del menú flotante de configuración (engranaje)
-        btnConfig.addEventListener('click', (e) => {
+        // Toggle del menú flotante de configuración (eliminado para capturistas)
+        btnConfig?.addEventListener('click', (e) => {
             e.stopPropagation();
-            dropdownConfig.classList.toggle('hidden');
+            dropdownConfig?.classList.toggle('hidden');
         });
 
-        // Ocultar el dropdown al hacer clic fuera del mismo
         document.addEventListener('click', () => {
-            dropdownConfig.classList.add('hidden');
+            dropdownConfig?.classList.add('hidden');
         });
 
-        // Opción del dropdown: Seleccionar Sesión (Sin solicitud de PIN)
-        btnOptSesion.addEventListener('click', () => {
+        btnOptSesion?.addEventListener('click', () => {
             abrirSeleccionSesion();
         });
 
-        // Opción del dropdown: Mostrar u ocultar el panel izquierdo de Reglas 1 y 2
-        btnOptReglas.addEventListener('click', () => {
-            panelReglas.classList.toggle('invisible');
-            panelReglas.classList.toggle('pointer-events-none');
+        btnOptReglas?.addEventListener('click', () => {
+            panelReglas?.classList.toggle('invisible');
+            panelReglas?.classList.toggle('pointer-events-none');
         });
 
         // Registrar triggers de botones y acciones del flujo
@@ -896,9 +879,10 @@
 
             function construirNombreSellos() {
                 const valores = campos.map(c => (c.value || '').trim().toUpperCase());
-                const nombreArmado = valores.join('_');
+                const hayAlguno = valores.some(v => v !== '');
+                const nombreArmado = hayAlguno ? valores.join('_') : '';
                 txtNombreEl.value = nombreArmado;
-                if (previewEl) previewEl.textContent = nombreArmado;
+                if (previewEl) previewEl.textContent = hayAlguno ? nombreArmado : '—';
                 txtNombreEl.dispatchEvent(new Event('input'));
             }
 
@@ -932,18 +916,15 @@
                 });
             });
 
-            // Al presionar Limpiar, restablecer segmentos y enfocar el primer campo editable
+            // Al presionar Limpiar, vaciar todos los segmentos y enfocar el primer campo
             document.getElementById('btnLimpiar')?.addEventListener('click', () => {
-                const delClave = (typeof delSeleccionada !== 'undefined' && delSeleccionada?.clave) ? delSeleccionada.clave : '01';
-                const defaults = [delClave, '00', '00', '00', '00', '00', '2024', '0001', '00'];
-                campos.forEach((c, i) => { c.value = defaults[i] ?? ''; });
+                campos.forEach(c => { c.value = ''; });
                 construirNombreSellos();
-                campos[1]?.focus();
-                campos[1]?.select();
+                campos[0]?.focus();
             });
 
             construirNombreSellos();
-            setTimeout(() => { campos[1]?.focus(); campos[1]?.select(); }, 250);
+            setTimeout(() => { campos[0]?.focus(); }, 250);
         })();
 
         // Botón Pantalla Completa eliminado por requerimiento operativo

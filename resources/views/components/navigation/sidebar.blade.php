@@ -140,8 +140,8 @@ JSON;
     <!-- Brand Header -->
     <div class="px-4 py-3.5 border-b border-slate-800/80 d-flex align-items-center justify-content-between flex-shrink-0">
         <a href="{{ url('/') }}" class="d-flex align-items-center text-white text-decoration-none" style="gap: 11px;">
-            <div class="w-9 h-9 rounded-xl bg-sky-600 d-flex align-items-center justify-content-center shadow-sm">
-                <i class="fa-solid fa-file-shield text-white text-base"></i>
+            <div class="w-9 h-9 rounded-xl bg-white p-1 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0">
+                <img src="{{ asset('img/favicon.png') }}" alt="Logo" class="w-full h-full" style="object-fit: contain;">
             </div>
             <div>
                 <span class="font-weight-bold d-block tracking-tight text-white" style="font-size: 0.9rem; line-height: 1.15;">Digitalización Chiapas 2026</span>
