@@ -126,6 +126,27 @@ class StellumBridgeService
     }
 
     /**
+     * Consulta en Stellum únicamente las PCs y Laptops marcadas como entregadas.
+     */
+    public function obtenerEquiposEntregados(): array
+    {
+        try {
+            $response = Http::withToken($this->token)
+                ->timeout(15)
+                ->get($this->baseUrl . '/equipos/entregados');
+
+            if ($response->successful()) {
+                return $response->json() ?: ['ok' => false, 'equipos' => []];
+            }
+
+            return ['ok' => false, 'status' => $response->status(), 'equipos' => [], 'error' => 'HTTP ' . $response->status()];
+        } catch (\Throwable $e) {
+            Log::warning('StellumBridgeService::obtenerEquiposEntregados error: ' . $e->getMessage());
+            return ['ok' => false, 'equipos' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Reenvía una petición del módulo de equipos hacia Stellum (Fuente Única de Verdad).
      */
     public function proxyEquipos(string $method, array $query = [], array $body = []): array

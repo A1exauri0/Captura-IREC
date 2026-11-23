@@ -9,16 +9,32 @@ use Illuminate\Http\Request;
 class InventarioEquiposController extends Controller
 {
     /**
-     * Muestra la vista de Inventario de Equipos sincronizada en tiempo real con Stellum,
-     * más el panel de asignación de PC/Laptop a usuarios de Captura-IREC.
+     * Muestra únicamente el listado de equipos marcados como ENTREGADOS en Stellum
+     * y permite asignarlos a los usuarios de Captura-IREC.
      */
-    public function index()
+    public function index(StellumBridgeService $bridge)
     {
         $usuarios = User::with('turnoRelacion')
             ->orderBy('name')
             ->get(['id', 'name', 'user', 'turno', 'turno_id', 'equipo_no_serie', 'equipo_tipo', 'equipo_tabla', 'equipo_id_stellum', 'equipo_marca', 'equipo_ubicacion']);
 
-        return view('configuracion.inventario_equipos', compact('usuarios'));
+        $respStellum = $bridge->obtenerEquiposEntregados();
+        $equiposEntregados = collect($respStellum['equipos'] ?? []);
+        $conexionStellumOk = (bool) ($respStellum['ok'] ?? false);
+        $errorStellum = $respStellum['error'] ?? null;
+
+        // Mapa rápido: no_serie => usuario asignado en Captura-IREC
+        $mapaAsignados = $usuarios
+            ->filter(fn ($u) => !empty($u->equipo_no_serie))
+            ->keyBy('equipo_no_serie');
+
+        return view('configuracion.inventario_equipos', compact(
+            'usuarios',
+            'equiposEntregados',
+            'conexionStellumOk',
+            'errorStellum',
+            'mapaAsignados'
+        ));
     }
 
     /**
