@@ -139,7 +139,10 @@ class StellumBridgeService
                 return $response->json() ?: ['ok' => false, 'equipos' => []];
             }
 
-            return ['ok' => false, 'status' => $response->status(), 'equipos' => [], 'error' => 'HTTP ' . $response->status()];
+            $jsonErr = $response->json();
+            $detalle = is_array($jsonErr) && !empty($jsonErr['error']) ? ': ' . $jsonErr['error'] : '';
+
+            return ['ok' => false, 'status' => $response->status(), 'equipos' => [], 'error' => 'HTTP ' . $response->status() . $detalle];
         } catch (\Throwable $e) {
             Log::warning('StellumBridgeService::obtenerEquiposEntregados error: ' . $e->getMessage());
             return ['ok' => false, 'equipos' => [], 'error' => $e->getMessage()];
