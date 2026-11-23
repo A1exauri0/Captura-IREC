@@ -1,10 +1,11 @@
 @extends('layouts.crud')
 
 @section('titulo', 'Gestión de Permisos')
-@section('crud_title', 'Permisos del Sistema')
-@section('crud_subtitle', 'Administra el catálogo de permisos granulares asignables a los roles.')
+@section('crud_modulo', 'Control de Acceso')
+@section('crud_titulo', 'Permisos del Sistema')
+@section('crud_subtitulo', 'Administra el catálogo de permisos granulares asignables a los roles.')
 
-@section('crud_content')
+@section('contenido')
     @if($errors->any())
         <div class="alert alert-danger rounded-lg mb-3">
             <ul class="mb-0 pl-3 text-sm">

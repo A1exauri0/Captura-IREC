@@ -1,11 +1,115 @@
 @php
-    $menuPath = resource_path('data/sidebar_menu.json');
-    $menuSections = file_exists($menuPath)
-        ? json_decode(file_get_contents($menuPath), true)
-        : [];
-    if (!is_array($menuSections)) {
-        $menuSections = [];
+    // Definición dinámica del menú en JSON directamente dentro del código del sidebar
+    $sidebarMenuJson = <<<'JSON'
+[
+    {
+        "section": "Operación",
+        "items": [
+            {
+                "label": "Estación de Captura",
+                "icon": "fa-solid fa-desktop",
+                "route": "admin.captura.index",
+                "active_routes": ["admin.captura.*"]
+            }
+        ]
+    },
+    {
+        "section": "Tiempo Real",
+        "items": [
+            {
+                "label": "Sesiones Activas",
+                "icon": "fa-solid fa-satellite-dish",
+                "route": "admin.analytics_sellos.reportes.lotes_trabajando",
+                "active_routes": ["admin.analytics_sellos.reportes.lotes_trabajando"],
+                "badge": "LIVE"
+            },
+            {
+                "label": "Autorizaciones",
+                "icon": "fa-solid fa-shield-halved",
+                "route": "admin.autorizaciones.index",
+                "active_routes": ["admin.autorizaciones.*"]
+            },
+            {
+                "label": "Explorador PDF",
+                "icon": "fa-solid fa-magnifying-glass",
+                "route": "admin.analytics_sellos.reportes.buscar_archivos",
+                "active_routes": ["admin.analytics_sellos.reportes.buscar_archivos"]
+            }
+        ]
+    },
+    {
+        "section": "Analíticas & Bitácora",
+        "items": [
+            {
+                "id": "submenu-indicadores",
+                "label": "Indicadores KPI",
+                "icon": "fa-solid fa-chart-pie",
+                "children": [
+                    { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.index" },
+                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.index" },
+                    { "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.capturas" },
+                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.index" }
+                ]
+            },
+            {
+                "id": "submenu-productividad",
+                "label": "Productividad",
+                "icon": "fa-solid fa-users-line",
+                "children": [
+                    { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.usuarios" },
+                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.usuarios" },
+                    { "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.reportes_capturas_notarias" },
+                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.usuarios" }
+                ]
+            },
+            {
+                "id": "submenu-bitacoras",
+                "label": "Bitácoras",
+                "icon": "fa-solid fa-clock-rotate-left",
+                "children": [
+                    { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.detalles_renombre" },
+                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.detalles_renombre" },
+                    { "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.detalles_renombre" },
+                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.detalles_renombre" }
+                ]
+            }
+        ]
+    },
+    {
+        "section": "Administración",
+        "items": [
+            {
+                "id": "submenu-acceso",
+                "label": "Control de Acceso",
+                "icon": "fa-solid fa-users-gear",
+                "children": [
+                    { "label": "Usuarios", "icon": "fa-solid fa-users", "route": "admin.usuarios.index" },
+                    { "label": "Roles", "icon": "fa-solid fa-user-shield", "route": "admin.roles.index" },
+                    { "label": "Permisos", "icon": "fa-solid fa-key", "route": "admin.permisos.index" }
+                ]
+            },
+            {
+                "label": "Turnos",
+                "icon": "fa-solid fa-user-clock",
+                "route": "admin.turnos.index",
+                "active_routes": ["admin.turnos.*"]
+            },
+            {
+                "id": "submenu-catalogos",
+                "label": "Catálogos",
+                "icon": "fa-solid fa-folder-tree",
+                "children": [
+                    { "label": "Rutas PDF", "icon": "fa-solid fa-network-wired", "route": "admin.catalogos.index" },
+                    { "label": "Delegaciones", "icon": "fa-solid fa-building-flag", "route": "admin.delegaciones.index" },
+                    { "label": "Municipios y Localidades", "icon": "fa-solid fa-map-location-dot", "route": "admin.municipios.index" }
+                ]
+            }
+        ]
     }
+]
+JSON;
+
+    $menuSections = json_decode($sidebarMenuJson, true) ?: [];
 @endphp
 
 <aside id="app-sidebar">
@@ -16,17 +120,17 @@
                 <i class="fa-solid fa-file-shield text-white text-base"></i>
             </div>
             <div>
-                <span class="font-weight-bold d-block text-sm tracking-tight text-white" style="line-height: 1.15;">CAPTURA IREC</span>
+                <span class="font-weight-bold d-block tracking-tight text-white" style="font-size: 0.9rem; line-height: 1.15;">CAPTURA IREC</span>
                 <span class="text-slate-400 font-medium" style="font-size: 0.7rem;">Auditoría Documental</span>
             </div>
         </a>
     </div>
 
-    <!-- Navigation Links dinámicos desde JSON + Scroll Personalizado -->
+    <!-- Navigation Links pintados dinámicamente desde JSON + Scroll Personalizado -->
     <div class="sidebar-scroll-wrapper flex-1 min-h-0">
         <nav id="sidebar-scroll-area" class="custom-scroll h-full overflow-y-auto px-3 py-4">
             @foreach($menuSections as $section)
-                <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                <div class="px-2.5 mb-1.5 text-slate-400 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
                     {{ $section['section'] ?? '' }}
                 </div>
                 <ul class="list-unstyled mb-4">
@@ -58,12 +162,12 @@
                                 <button type="button"
                                         data-submenu-toggle="{{ $submenuId }}"
                                         aria-expanded="{{ $isActive ? 'true' : 'false' }}"
-                                        class="w-100 border-0 bg-transparent d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left {{ $isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}"
-                                        style="cursor: pointer; outline: none;">
-                                    <i class="{{ $item['icon'] ?? 'fa-solid fa-circle' }} w-5 text-center mr-2.5 {{ $isActive ? 'text-sky-400' : ($item['icon_color'] ?? 'text-slate-400') }}"></i>
+                                        class="w-100 border-0 bg-transparent d-flex align-items-center px-3 py-2 rounded-lg font-medium transition-colors text-left {{ $isActive ? 'bg-slate-800 text-white' : 'text-slate-200 hover:bg-slate-800/80 hover:text-white' }}"
+                                        style="font-size: 0.875rem; color: {{ $isActive ? '#ffffff' : '#e2e8f0' }}; cursor: pointer; outline: none;">
+                                    <i class="{{ $item['icon'] ?? 'fa-solid fa-circle' }} w-5 text-center mr-2.5" style="color: {{ $isActive ? '#38bdf8' : '#cbd5e1' }};"></i>
                                     <span class="flex-1">{{ $item['label'] }}</span>
-                                    <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-200 submenu-arrow"
-                                       style="transform: rotate({{ $isActive ? '180deg' : '0deg' }});"></i>
+                                    <i class="fa-solid fa-chevron-down text-xs transition-transform duration-200 submenu-arrow"
+                                       style="color: #94a3b8; transform: rotate({{ $isActive ? '180deg' : '0deg' }});"></i>
                                 </button>
                                 <ul id="{{ $submenuId }}"
                                     class="list-unstyled mt-1 mb-1 pl-3 ml-3 border-l border-slate-700/70 {{ $isActive ? '' : 'd-none' }}">
@@ -75,8 +179,9 @@
                                         @endphp
                                         <li class="mb-0.5">
                                             <a href="{{ $childHref }}"
-                                               class="d-flex align-items-center px-2.5 py-1.5 rounded-md text-xs font-medium text-decoration-none transition-colors {{ $childActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white' }}">
-                                                <i class="{{ $child['icon'] ?? 'fa-solid fa-angle-right' }} w-4 text-center mr-2 {{ $childActive ? 'text-white' : 'text-slate-500' }}"></i>
+                                               class="d-flex align-items-center px-2.5 py-1.5 rounded-md font-medium text-decoration-none transition-colors {{ $childActive ? 'bg-sky-600 text-white shadow-sm' : 'hover:bg-slate-800/70' }}"
+                                               style="font-size: 0.78rem; color: {{ $childActive ? '#ffffff' : '#cbd5e1' }};">
+                                                <i class="{{ $child['icon'] ?? 'fa-solid fa-angle-right' }} w-4 text-center mr-2" style="color: {{ $childActive ? '#ffffff' : '#94a3b8' }};"></i>
                                                 <span>{{ $child['label'] }}</span>
                                             </a>
                                         </li>
@@ -90,11 +195,12 @@
                             @endphp
                             <li class="mb-1">
                                 <a href="{{ $itemHref }}"
-                                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $isActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                                    <i class="{{ $item['icon'] ?? 'fa-solid fa-circle' }} w-5 text-center mr-2.5 {{ $isActive ? 'text-white' : ($item['icon_color'] ?? 'text-slate-400') }}"></i>
+                                   class="d-flex align-items-center px-3 py-2 rounded-lg font-medium text-decoration-none transition-colors {{ $isActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-200 hover:bg-slate-800/80 hover:text-white' }}"
+                                   style="font-size: 0.875rem; color: {{ $isActive ? '#ffffff' : '#e2e8f0' }};">
+                                    <i class="{{ $item['icon'] ?? 'fa-solid fa-circle' }} w-5 text-center mr-2.5" style="color: {{ $isActive ? '#ffffff' : '#cbd5e1' }};"></i>
                                     <span>{{ $item['label'] }}</span>
                                     @if(!empty($item['badge']))
-                                        <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded {{ $item['badge_class'] ?? 'bg-sky-500/20 text-sky-300' }}" style="font-size: 0.6rem;">
+                                        <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" style="font-size: 0.6rem;">
                                             {{ $item['badge'] }}
                                         </span>
                                     @endif

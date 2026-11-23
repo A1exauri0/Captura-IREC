@@ -161,9 +161,29 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/asignar', [TurnoController::class, 'asignarUsuarios'])->name('asignar');
         });
 
-        // Catálogos y rutas PDF
+        // Catálogos: Rutas PDF, CRUD Delegaciones y CRUD Municipios/Localidades
         Route::name('admin.catalogos.')->prefix('catalogos')->group(function () {
             Route::get('/', [CatalogoController::class, 'index'])->name('index');
+        });
+
+        Route::name('admin.delegaciones.')->prefix('delegaciones')->group(function () {
+            Route::get('/', [CatalogoController::class, 'delegaciones'])->name('index');
+            Route::post('/', [CatalogoController::class, 'storeDelegacion'])->name('store');
+            Route::put('/{id}', [CatalogoController::class, 'updateDelegacion'])->name('update');
+            Route::delete('/{id}', [CatalogoController::class, 'destroyDelegacion'])->name('destroy');
+        });
+
+        Route::name('admin.municipios.')->prefix('municipios')->group(function () {
+            Route::get('/', [CatalogoController::class, 'municipios'])->name('index');
+            Route::post('/', [CatalogoController::class, 'storeMunicipio'])->name('store');
+            Route::put('/{id}', [CatalogoController::class, 'updateMunicipio'])->name('update');
+            Route::delete('/{id}', [CatalogoController::class, 'destroyMunicipio'])->name('destroy');
+        });
+
+        Route::name('admin.localidades.')->prefix('localidades')->group(function () {
+            Route::post('/', [CatalogoController::class, 'storeLocalidad'])->name('store');
+            Route::put('/{id}', [CatalogoController::class, 'updateLocalidad'])->name('update');
+            Route::delete('/{id}', [CatalogoController::class, 'destroyLocalidad'])->name('destroy');
         });
     });
 });

@@ -1,16 +1,17 @@
 @extends('layouts.crud')
 
 @section('titulo', 'Gestión de Usuarios')
-@section('crud_title', 'Usuarios del Sistema')
-@section('crud_subtitle', 'Administra las cuentas, turnos adaptativos y roles asignados de forma centralizada.')
+@section('crud_modulo', 'Control de Acceso')
+@section('crud_titulo', 'Usuarios del Sistema')
+@section('crud_subtitulo', 'Administra las cuentas, turnos adaptativos y roles asignados de forma centralizada.')
 
-@section('crud_actions')
+@section('crud_acciones')
     <button type="button" class="btn btn-primary btn-sm px-3" style="background-color:#034d6d;border-color:#034d6d;" data-toggle="modal" data-target="#modalCrearUsuario">
         <i class="fa-solid fa-user-plus mr-1"></i> Nuevo Usuario
     </button>
 @endsection
 
-@section('crud_content')
+@section('contenido')
     @if($errors->any())
         <div class="alert alert-danger rounded-lg mb-3">
             <ul class="mb-0 pl-3 text-sm">
