@@ -2,24 +2,31 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\User;
+use App\Models\Turno;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            TurnosSeeder::class,
+            RolesSeeder::class,
+            AnioSeeder::class,
+            DelegacionesSeeder::class,
+            StellMunicipiosSeeder::class,
+            LocalidadesSeeder::class,
+            UsersSeeder::class,
         ]);
+
+        // Sincronizar turno_id en todos los usuarios según su campo 'turno'
+        $mapaTurnos = Turno::pluck('id', 'nombre')->toArray();
+        foreach ($mapaTurnos as $nombre => $id) {
+            DB::table('users')
+                ->whereRaw('LOWER(turno) = ?', [strtolower($nombre)])
+                ->update(['turno_id' => $id]);
+        }
     }
 }

@@ -6,17 +6,31 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        Schema::create('turnos', function (Blueprint $table) {
+            $table->id();
+            $table->string('nombre')->unique();
+            $table->time('hora_entrada')->default('07:00:00');
+            $table->time('hora_salida')->default('15:00:00');
+            $table->boolean('cruza_medianoche')->default(false);
+            $table->string('color_hex', 20)->default('#034d6d');
+            $table->string('descripcion')->nullable();
+            $table->boolean('estatus')->default(true);
+            $table->timestamps();
+        });
+
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('user')->unique();
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->foreignId('turno_id')->nullable()->constrained('turnos')->onUpdate('cascade')->onDelete('set null');
+            $table->string('turno')->nullable()->default('Matutino');
+            $table->string('pin', 10)->nullable();
+            $table->boolean('estatus')->default(true);
             $table->rememberToken();
             $table->timestamps();
         });
@@ -37,13 +51,11 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('turnos');
     }
 };

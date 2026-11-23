@@ -1,0 +1,169 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use App\Models\StellMunicipios;
+use Illuminate\Support\Facades\DB;
+
+class StellMunicipiosSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        $municipios = [
+            [7, 'ACACOYAGUA', '001'],
+            [7, 'ACALA', '002'],
+            [7, 'ACAPETAHUA', '003'],
+            [7, 'ALTAMIRANO', '004'],
+            [7, 'AMATÁN', '005'],
+            [7, 'AMATENANGO DE LA FRONTERA', '006'],
+            [7, 'AMATENANGO DEL VALLE', '007'],
+            [7, 'ÁNGEL ALBINO CORZO', '008'],
+            [7, 'ARRIAGA', '009'],
+            [7, 'BEJUCAL DE OCAMPO', '010'],
+            [7, 'BELLA VISTA', '011'],
+            [7, 'BERRIOZÁBAL', '012'],
+            [7, 'BOCHIL', '013'],
+            [7, 'EL BOSQUE', '014'],
+            [7, 'CACAHOATÁN', '015'],
+            [7, 'CATAZAJÁ', '016'],
+            [7, 'CINTALAPA DE FIGUEROA', '017'],
+            [7, 'COAPILLA', '018'],
+            [7, 'COMITÁN DE DOMÍNGUEZ', '019'],
+            [7, 'LA CONCORDIA', '020'],
+            [7, 'COPAINALÁ', '021'],
+            [7, 'CHALCHIHUITÁN', '022'],
+            [7, 'CHAMULA', '023'],
+            [7, 'CHANAL', '024'],
+            [7, 'CHAPULTENANGO', '025'],
+            [7, 'CHENALHÓ', '026'],
+            [7, 'CHIAPA DE CORZO', '027'],
+            [7, 'CHIAPILLA', '028'],
+            [7, 'CHICOASÉN', '029'],
+            [7, 'CHICOMUSELO', '030'],
+            [7, 'CHILÓN', '031'],
+            [7, 'ESCUINTLA', '032'],
+            [7, 'FRANCISCO LEÓN', '033'],
+            [7, 'FRONTERA COMALAPA', '034'],
+            [7, 'FRONTERA HIDALGO', '035'],
+            [7, 'LA GRANDEZA', '036'],
+            [7, 'HUEHUETÁN', '037'],
+            [7, 'HUIXTÁN', '038'],
+            [7, 'HUITIUPÁN', '039'],
+            [7, 'HUIXTLA', '040'],
+            [7, 'LA INDEPENDENCIA', '041'],
+            [7, 'IXHUATÁN', '042'],
+            [7, 'IXTACOMITÁN', '043'],
+            [7, 'IXTAPA', '044'],
+            [7, 'IXTAPANGAJOYA', '045'],
+            [7, 'JIQUIPILAS', '046'],
+            [7, 'JITOTOL', '047'],
+            [7, 'JUÁREZ', '048'],
+            [7, 'LARRÁINZAR', '049'],
+            [7, 'LA LIBERTAD', '050'],
+            [7, 'MAPASTEPEC', '051'],
+            [7, 'LAS MARGARITAS', '052'],
+            [7, 'MAZAPA DE MADERO', '053'],
+            [7, 'MAZATÁN', '054'],
+            [7, 'METAPA', '055'],
+            [7, 'MITONTIC', '056'],
+            [7, 'MOTOZINTLA', '057'],
+            [7, 'NICOLÁS RUÍZ', '058'],
+            [7, 'OCOSINGO', '059'],
+            [7, 'OCOTEPEC', '060'],
+            [7, 'OCOZOCOAUTLA DE ESPINOSA', '061'],
+            [7, 'OSTUACÁN', '062'],
+            [7, 'OSUMACINTA', '063'],
+            [7, 'OXCHUC', '064'],
+            [7, 'PALENQUE', '065'],
+            [7, 'PANTELHÓ', '066'],
+            [7, 'PANTEPEC', '067'],
+            [7, 'PICHUCALCO', '068'],
+            [7, 'PIJIJIAPAN', '069'],
+            [7, 'EL PORVENIR', '070'],
+            [7, 'VILLA COMALTITLÁN', '071'],
+            [7, 'PUEBLO NUEVO SOLISTAHUACÁN', '072'],
+            [7, 'RAYÓN', '073'],
+            [7, 'REFORMA', '074'],
+            [7, 'LAS ROSAS', '075'],
+            [7, 'SABANILLA', '076'],
+            [7, 'SALTO DE AGUA', '077'],
+            [7, 'SAN CRISTÓBAL DE LAS CASAS', '078'],
+            [7, 'SAN FERNANDO', '079'],
+            [7, 'SILTEPEC', '080'],
+            [7, 'SIMOJOVEL', '081'],
+            [7, 'SITALÁ', '082'],
+            [7, 'SOCOLTENANGO', '083'],
+            [7, 'SOLOSUCHIAPA', '084'],
+            [7, 'SOYALÓ', '085'],
+            [7, 'SUCHIAPA', '086'],
+            [7, 'SUCHIATE', '087'],
+            [7, 'SUNUAPA', '088'],
+            [7, 'TAPACHULA', '089'],
+            [7, 'TAPALAPA', '090'],
+            [7, 'TAPILULA', '091'],
+            [7, 'TECPATÁN', '092'],
+            [7, 'TENEJAPA', '093'],
+            [7, 'TEOPISCA', '094'],
+            [7, 'TILA', '096'],
+            [7, 'TONALÁ', '097'],
+            [7, 'TOTOLAPA', '098'],
+            [7, 'LA TRINITARIA', '099'],
+            [7, 'TUMBALÁ', '100'],
+            [7, 'TUXTLA GUTIÉRREZ', '101'],
+            [7, 'TUXTLA CHICO', '102'],
+            [7, 'TUZANTÁN', '103'],
+            [7, 'TZIMOL', '104'],
+            [7, 'UNIÓN JUÁREZ', '105'],
+            [7, 'VENUSTIANO CARRANZA', '106'],
+            [7, 'VILLA CORZO', '107'],
+            [7, 'VILLAFLORES', '108'],
+            [7, 'YAJALÓN', '109'],
+            [7, 'SAN LUCAS', '110'],
+            [7, 'ZINACANTÁN', '111'],
+            [7, 'SAN JUAN CANCUC', '112'],
+            [7, 'ALDAMA', '113'],
+            [7, 'BENEMÉRITO DE LAS AMÉRICAS', '114'],
+            [7, 'MARAVILLA TENEJAPA', '115'],
+            [7, 'MARQUÉS DE COMILLAS', '116'],
+            [7, 'MONTECRISTO DE GUERRERO', '117'],
+            [7, 'SAN ANDRÉS DURAZNAL', '118'],
+            [7, 'SANTIAGO EL PINAR', '119'],
+            [7, 'CAPITÁN LUIS ÁNGEL VIDAL', '120'],
+            [7, 'RINCÓN CHAMULA SAN PEDRO', '121'],
+            [7, 'EL PARRAL', '122'],
+            [7, 'EMILIANO ZAPATA', '123'],
+            [7, 'MEZCALAPA', '124'],
+            [7, 'HONDURAS DE LA SIERRA', '125'],
+        ];
+
+        $data = [];
+        foreach ($municipios as $m) {
+            $data[] = [
+                'estado' => $m[0],
+                'nombre' => $m[1],
+                'clave'  => $m[2],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::beginTransaction();
+        try {
+            // Opcional: Limpiar la tabla antes si es necesario
+            // StellMunicipios::truncate();
+            
+            StellMunicipios::insert($data);
+            DB::commit();
+            $this->command->info("¡Seeder de StellMunicipios completado!");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $this->command->error("Error: " . $e->getMessage());
+        }
+    }
+}
