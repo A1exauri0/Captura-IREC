@@ -111,6 +111,12 @@
                 "active_routes": ["admin.asignaciones.*"]
             },
             {
+                "label": "Inventario de Equipos",
+                "icon": "fa-solid fa-laptop",
+                "route": "admin.equipos.index",
+                "active_routes": ["admin.equipos.*"]
+            },
+            {
                 "id": "submenu-catalogos",
                 "label": "Catálogos",
                 "icon": "fa-solid fa-folder-tree",

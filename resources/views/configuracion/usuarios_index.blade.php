@@ -36,6 +36,7 @@
                         <th>Usuario / Correo</th>
                         <th>Rol</th>
                         <th>Turno</th>
+                        <th>PC / Equipo Asignado</th>
                         <th>Estado</th>
                         <th class="text-right px-3">Acciones</th>
                     </tr>
@@ -60,6 +61,18 @@
                                 <span class="badge badge-light border text-slate-700">
                                     {{ $u->turnoRelacion->nombre ?? $u->turno ?? 'Matutino' }}
                                 </span>
+                            </td>
+                            <td>
+                                @if($u->equipo_no_serie)
+                                    <span class="badge badge-primary" style="background-color:#034d6d;">
+                                        <i class="fa-solid fa-desktop mr-1"></i> {{ $u->equipo_no_serie }}
+                                    </span>
+                                    <div class="text-muted" style="font-size: 11px;">
+                                        {{ $u->equipo_tipo ?: 'PC' }} {{ $u->equipo_marca ? '· ' . $u->equipo_marca : '' }}
+                                    </div>
+                                @else
+                                    <span class="text-xs text-muted">Sin equipo</span>
+                                @endif
                             </td>
                             <td>
                                 @if($u->estatus)

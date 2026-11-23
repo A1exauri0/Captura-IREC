@@ -19,6 +19,12 @@ class User extends Authenticatable
         'turno_id',
         'turno',
         'estatus',
+        'equipo_no_serie',
+        'equipo_tipo',
+        'equipo_tabla',
+        'equipo_id_stellum',
+        'equipo_marca',
+        'equipo_ubicacion',
     ];
 
     protected $hidden = [

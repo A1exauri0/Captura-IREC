@@ -11,6 +11,7 @@ use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\PeticionAutorizacionController;
 use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\FlujoStellumController;
+use App\Http\Controllers\InventarioEquiposController;
 
 // =========================================================================
 // AUTENTICACIÓN
@@ -207,6 +208,15 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [FlujoStellumController::class, 'asignaciones'])->name('index');
             Route::post('/', [FlujoStellumController::class, 'guardarAsignacion'])->name('guardar');
             Route::delete('/{id}', [FlujoStellumController::class, 'eliminarAsignacion'])->name('eliminar');
+        });
+
+        // Inventario de Equipos sincronizado en tiempo real con Stellum + Asignación de PC por Usuario
+        Route::name('admin.equipos.')->prefix('equipos')->group(function () {
+            Route::get('/', [InventarioEquiposController::class, 'index'])->name('index');
+            Route::match(['get', 'post'], '/api', [InventarioEquiposController::class, 'apiProxy'])->name('api');
+            Route::get('/exportar-excel', [InventarioEquiposController::class, 'exportarExcel'])->name('exportar_excel');
+            Route::post('/asignar-usuario', [InventarioEquiposController::class, 'asignarUsuario'])->name('asignar_usuario');
+            Route::delete('/desasignar-usuario/{userId}', [InventarioEquiposController::class, 'desasignarUsuario'])->name('desasignar_usuario');
         });
     });
 });

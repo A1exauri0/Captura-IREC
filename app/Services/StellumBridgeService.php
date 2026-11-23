@@ -124,4 +124,43 @@ class StellumBridgeService
             return ['ok' => false, 'error' => $e->getMessage()];
         }
     }
+
+    /**
+     * Reenvía una petición del módulo de equipos hacia Stellum (Fuente Única de Verdad).
+     */
+    public function proxyEquipos(string $method, array $query = [], array $body = []): array
+    {
+        try {
+            $url = $this->baseUrl . '/equipos/api';
+            if (!empty($query)) {
+                $url .= '?' . http_build_query($query);
+            }
+
+            $http = Http::withToken($this->token)->timeout(25);
+            $response = strtoupper($method) === 'POST'
+                ? $http->post($url, $body)
+                : $http->get($url);
+
+            return [
+                'status' => $response->status(),
+                'body'   => $response->json() ?? ['exito' => false, 'mensaje' => $response->body()],
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('StellumBridgeService::proxyEquipos error: ' . $e->getMessage());
+            return [
+                'status' => 502,
+                'body'   => ['exito' => false, 'mensaje' => 'No se pudo conectar con Stellum: ' . $e->getMessage()],
+            ];
+        }
+    }
+
+    /**
+     * Descarga el archivo Excel de inventario de equipos directamente desde Stellum.
+     */
+    public function descargarExcelEquipos()
+    {
+        return Http::withToken($this->token)
+            ->timeout(45)
+            ->get($this->baseUrl . '/equipos/exportar-excel');
+    }
 }
