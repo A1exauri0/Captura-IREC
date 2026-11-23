@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validación PDF</title>
+    <!-- PWA Manifest & Meta -->
+    <link rel="manifest" href="{{ asset('manifest.json') }}">
+    <meta name="theme-color" content="#1f2937">
+    <link rel="apple-touch-icon" href="{{asset('img/favicon/favicon.png')}}">
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#0078d7',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Módulos JS de captura -->
+    <script src="{{ asset('js/captura/capturaReglas.js') }}"></script>
+    <script src="{{ asset('js/captura/capturaArchivos.js') }}"></script>
+    <script src="{{ asset('js/captura/capturaAuditoria.js') }}"></script>
+    <script src="{{ asset('js/captura/capturaProcesos.js') }}"></script>
+</head>
+
+<body
+    class="h-screen w-screen overflow-hidden bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans selection:bg-brand selection:text-white">
+
+    <div class="flex flex-col h-full w-full">
+        <!-- Visor de PDF -->
+        <iframe class="flex-grow w-full border-none bg-white" id="pdfViewer" src="about:blank"></iframe>
+
+        <!-- Splitter -->
+        <div
+            class="h-1 bg-gray-300 dark:bg-gray-700 cursor-ns-resize hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">
+        </div>
+
+        <!-- Panel de controles inferior -->
+        <div
+            class="relative bg-gray-200 dark:bg-gray-800 px-8 py-6 min-h-[220px] flex items-start gap-12 transition-colors duration-200">
+
+            <!-- Bloque 1: Reglas -->
+            <div id="panelReglas" class="flex flex-col gap-3 min-w-[180px] mt-2">
+                <label class="flex items-center gap-2 text-lg cursor-pointer hover:text-brand transition-colors">
+                    <input type="radio" name="regla" id="rbRegla1" class="w-5 h-5 accent-brand" checked>
+                    Regla 1 (Registros)
+                </label>
+                <label class="flex items-center gap-2 text-lg cursor-pointer hover:text-brand transition-colors">
+                    <input type="radio" name="regla" id="rbRegla2" class="w-5 h-5 accent-brand">
+                    Regla 2 (Sellos)
+                </label>
+            </div>
+
+            <!-- Bloque 2: Input y Estado -->
+            <div class="flex flex-col gap-2 flex-grow max-w-[500px]">
+                <div class="text-xl font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Delegación - Lote 60
+                </div>
+                <div class="text-lg text-gray-700 dark:text-gray-300 mb-1 h-6" id="lblEstado">Estado</div>
+
+                <div class="flex gap-2">
+                    <input type="text" id="txtNombre" autocomplete="off"
+                        class="w-full px-4 py-2 text-2xl font-bold bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-shadow text-gray-900 dark:text-white">
+
+                    <button id="btnRenombrar"
+                        class="px-5 py-2 text-xl font-bold bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm whitespace-nowrap">
+                        Renombrar
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="btnLimpiar"
+                        class="mt-1 px-4 py-1 text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-eraser text-xs"></i> Limpiar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bloque 3: Acciones (Mismo formato que la app) -->
+            <div class="flex flex-col gap-3 min-w-[320px]">
+                <div class="text-lg font-bold" id="lblCaptura">Primera captura</div>
+
+                <!-- Fila 1: Duplicar, Inconsistencia -->
+                <div class="flex items-center gap-2">
+                    <button id="btnDuplicar"
+                        class="px-5 py-1.5 text-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm w-[130px]">
+                        Duplicar
+                    </button>
+                    <button id="btnInconsistencia"
+                        class="px-5 py-1.5 text-lg bg-yellow-400 hover:bg-yellow-500 text-black rounded border border-yellow-500 transition-colors flex items-center justify-center gap-2 shadow-sm w-[200px]">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Inconsistencia
+                    </button>
+                </div>
+
+                <!-- Fila 2: Mover, Pantalla, Oscuro, Refrescar, Config, Cerrar -->
+                <div class="flex items-center gap-2">
+                    <button id="btnMover"
+                        class="px-5 py-1.5 text-lg bg-[#87cefa] hover:bg-blue-400 text-black rounded border border-blue-400 transition-colors flex items-center justify-center gap-2 shadow-sm w-[130px]">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Mover
+                    </button>
+
+                    <button id="btnPantallaCompleta"
+                        class="px-4 py-1.5 text-lg bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-expand"></i> Pantalla
+                    </button>
+
+                    <button id="btnModo"
+                        class="px-4 py-1.5 text-lg bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-moon"></i> Oscuro
+                    </button>
+                </div>
+
+                <!-- Rotación y Página -->
+                <div class="flex items-center gap-3 text-lg mt-1">
+                    <strong class="mr-1">Rotar:</strong>
+                    <button id="btnRotarIzquierda" title="Rotar Izquierda"
+                        class="w-10 h-9 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <button id="btnRotarDerecha" title="Rotar Derecha"
+                        class="w-10 h-9 flex items-center justify-center bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-400 dark:border-gray-600 transition-colors shadow-sm">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                    <span class="ml-2">Pág</span>
+                    <input type="number" id="nudPagina" min="1" max="1" value="1" readonly
+                        class="w-16 px-2 py-1 text-center text-lg bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand shadow-sm pointer-events-none opacity-80">
+                </div>
+            </div>
+
+            <!-- Controles superiores derechos (Absolutos) -->
+            <div class="absolute top-5 right-8 flex gap-2">
+                <button id="btnRefrescar" title="Refrescar"
+                    class="flex items-center justify-center w-10 h-[38px] bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm">
+                    <i class="fa-solid fa-sync"></i>
+                </button>
+                <div class="relative">
+                    <button id="btnConfig" title="Configuración"
+                        class="flex items-center justify-center w-10 h-[38px] bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 transition-colors shadow-sm">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <!-- Menú flotante de configuración -->
+                    <div id="dropdownConfig"
+                        class="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 hidden z-50">
+                        <button id="btnOptSesion"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center">
+                            <i class="fa-solid fa-folder-tree mr-2 text-amber-500 w-4"></i> Seleccionar Directorio
+                        </button>
+                        <button id="btnOptReglas"
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center">
+                            <i class="fa-solid fa-eye-slash mr-2 text-brand w-4"></i> Mostrar/Ocultar Reglas
+                        </button>
+                    </div>
+                </div>
+                <button id="btnCerrarSesion"
+                    class="flex items-center gap-2 px-3 py-1.5 text-base font-bold bg-red-600 hover:bg-red-700 text-white rounded border border-red-800 transition-colors shadow-sm ml-2">
+                    <i class="fa-solid fa-power-off"></i> Cerrar sesión
+                </button>
+            </div>
+
+            <div class="absolute bottom-4 right-8 text-sm text-gray-500 dark:text-gray-400">
+                version 5.0
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Pin Maestro -->
+    <div id="modalPinMaestro" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+        <div
+            class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg shadow-xl w-[90%] max-w-[360px] p-5 border border-gray-300 dark:border-gray-700">
+            <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                <i class="fa-solid fa-lock text-brand text-2xl"></i>
+                <h3 class="font-bold text-lg">PIN Maestro</h3>
+            </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Ingrese el PIN maestro para autorizar la acción.
+            </p>
+            <p id="lblPinError" class="text-sm text-red-500 font-semibold mb-4 text-center hidden"></p>
+            <input type="password" id="txtPinMaestro" maxlength="10" placeholder="••••" autocomplete="off"
+                class="w-full px-3 py-2 text-center text-xl font-bold tracking-widest bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand mb-4 text-gray-900 dark:text-white">
+            <div class="flex justify-end gap-2">
+                <button id="btnPinCancelar"
+                    class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded font-semibold transition-colors">
+                    Cancelar
+                </button>
+                <button id="btnPinAceptar"
+                    class="px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded font-semibold transition-colors">
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmación y Alertas Genérico -->
+    <div id="modalConfirmacion" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+        <div
+            class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg shadow-xl w-[90%] max-w-[380px] p-5 border border-gray-300 dark:border-gray-700">
+            <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                <i id="iconConfirmacion" class="fa-solid fa-circle-question text-brand text-2xl"></i>
+                <h3 id="lblConfirmacionTitulo" class="font-bold text-lg text-gray-800 dark:text-gray-200">Confirmar</h3>
+            </div>
+            <p id="lblConfirmacionMensaje" class="text-sm text-gray-600 dark:text-gray-400 mb-5">
+                ¿Está seguro de realizar esta acción?
+            </p>
+            <div class="flex justify-end gap-2">
+                <button id="btnConfirmarCancelar"
+                    class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded font-semibold text-gray-700 dark:text-gray-300 transition-colors">
+                    Cancelar
+                </button>
+                <button id="btnConfirmarAceptar"
+                    class="px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded font-semibold transition-colors">
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Procesando (Spinner de carga bloqueante) -->
+    <div id="modalProcesando" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+        <div
+            class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg shadow-xl w-[90%] max-w-[380px] p-5 border border-gray-300 dark:border-gray-700">
+            <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                <i class="fa-solid fa-spinner fa-spin text-brand text-2xl"></i>
+                <h3 id="lblProcesandoTitulo" class="font-bold text-lg text-gray-800 dark:text-gray-200">Procesando...</h3>
+            </div>
+            <p id="lblProcesandoMensaje" class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Por favor espere un momento.
+            </p>
+        </div>
+    </div>
+
+    <!-- Modal Selección de Sesión (Directorio y Delegación) -->
+    <div id="modalSeleccionSesion" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+        <div
+            class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg shadow-xl w-[90%] max-w-[700px] p-6 max-h-[90vh] flex flex-col border border-gray-300 dark:border-gray-700">
+            <!-- Cabecera -->
+            <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                <div>
+                    <h3 class="font-bold text-xl flex items-center gap-2">
+                        <i class="fa-solid fa-folder-tree text-amber-500"></i> Selección de Directorio de Trabajo
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1" id="lblUsuarioSesion">
+                        Usuario: Administrador
+                    </p>
+                </div>
+                <button id="btnSesionRefrescar" title="Refrescar Directorios"
+                    class="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors text-gray-600 dark:text-gray-300">
+                    <i class="fa-solid fa-arrows-rotate text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Contenido dividido en tres paneles: Directorios/Entregas, Delegaciones y Filtro de Municipio/Localidad -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 flex-grow overflow-y-auto mb-4 min-h-[300px]">
+                <!-- Panel 1: Directorios / Rutas PDF Configuradas -->
+                <div
+                    class="flex flex-col border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-900/30">
+                    <h4 class="font-bold text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+                        1. Rutas y Entregas PDF (Stellum)
+                    </h4>
+                    <div id="lstDirectorios"
+                        class="flex-grow overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 max-h-[260px]">
+                        <!-- Lista de directorios inyectada por JS -->
+                    </div>
+                </div>
+
+                <!-- Panel 2: Delegaciones -->
+                <div
+                    class="flex flex-col border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-900/30">
+                    <h4 class="font-bold text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+                        2. Delegaciones Disponibles
+                    </h4>
+                    <div id="lstDelegaciones"
+                        class="flex-grow overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 max-h-[260px]">
+                        <!-- Lista de delegaciones inyectada por JS -->
+                    </div>
+                </div>
+
+                <!-- Panel 3: Catálogo de Municipios y Localidades (Seeders) -->
+                <div
+                    class="flex flex-col border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-900/30">
+                    <h4 class="font-bold text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
+                        3. Catálogo Municipio / Localidad
+                    </h4>
+                    <select id="selMunicipioFiltro" class="w-full px-2.5 py-1.5 mb-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
+                        <option value="">-- Seleccione Municipio (001-125) --</option>
+                    </select>
+                    <input type="text" id="txtBuscarLocalidad" placeholder="Filtrar localidad o clave..."
+                        class="w-full px-2.5 py-1.5 mb-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
+                    <div id="lstLocalidades"
+                        class="flex-grow overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 max-h-[175px] text-xs">
+                        <div class="text-gray-400 p-3 text-center">Seleccione un municipio para ver sus localidades.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer: Estado de conexión y acciones -->
+            <div
+                class="border-t border-gray-200 dark:border-gray-700 pt-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div id="lblEstadoConexion" class="text-sm font-semibold text-gray-500">
+                    Seleccione un directorio de trabajo.
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto justify-end">
+                    <button id="btnSesionCancelar"
+                        class="px-5 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded font-semibold transition-colors w-full sm:w-auto">
+                        Cancelar
+                    </button>
+                    <button id="btnComenzar" disabled
+                        class="px-5 py-2 bg-brand text-white hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed rounded font-semibold transition-colors w-full sm:w-auto flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> Comenzar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input selector de archivo oculto -->
+    <input type="file" id="fileSelector" accept="application/pdf" class="hidden">
+
+    <script>
+        // ==============================
+        // CATÁLOGOS INYECTADOS DESDE LARAVEL
+        // ==============================
+        const catalogoAnios = @json($anios).map(String);
+        const catalogoDelegaciones = @json($delegaciones);
+        const catalogoMunicipios = @json($municipios ?? []);
+        const usuarioNombre = "{{ Auth::user()->name ?? 'Administrador' }}";
+        const usuarioId = {{ Auth::id() ?? 'null' }};
+
+        // Configuración de Directorios y Entregas de Trabajo (desde config/captura_pdf.php)
+        const directoriosPorDefecto = @json($directoriosPorDefecto ?? []);
+
+        let directoriosConfig = directoriosPorDefecto.length > 0 ? directoriosPorDefecto : (JSON.parse(localStorage.getItem('val_directorios_config')) || []);
+
+        // Inicializar selector de Municipios y Localidades
+        document.addEventListener('DOMContentLoaded', () => {
+            const selMun = document.getElementById('selMunicipioFiltro');
+            const txtLoc = document.getElementById('txtBuscarLocalidad');
+            const lstLoc = document.getElementById('lstLocalidades');
+
+            if (selMun && catalogoMunicipios.length > 0) {
+                catalogoMunicipios.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.id;
+                    opt.textContent = `${m.clave} - ${m.nombre}`;
+                    selMun.appendChild(opt);
+                });
+
+                async function cargarLocalidades() {
+                    const munId = selMun.value;
+                    const q = txtLoc ? txtLoc.value.trim() : '';
+                    if (!munId && !q) {
+                        lstLoc.innerHTML = '<div class="text-gray-400 p-3 text-center">Seleccione un municipio para ver sus localidades.</div>';
+                        return;
+                    }
+                    lstLoc.innerHTML = '<div class="text-blue-500 p-3 text-center"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Cargando localidades...</div>';
+                    try {
+                        const res = await fetch(`/captura/localidades?municipio_id=${encodeURIComponent(munId)}&q=${encodeURIComponent(q)}`);
+                        const data = await res.json();
+                        if (!data.localidades || data.localidades.length === 0) {
+                            lstLoc.innerHTML = '<div class="text-gray-400 p-3 text-center">Sin localidades encontradas.</div>';
+                            return;
+                        }
+                        lstLoc.innerHTML = data.localidades.map(l => `
+                            <div class="px-2.5 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 flex justify-between items-center">
+                                <span class="font-medium text-gray-800 dark:text-gray-200">${l.nombre}</span>
+                                <span class="px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200 rounded font-mono text-[11px]">${l.clave}</span>
+                            </div>
+                        `).join('');
+                    } catch (e) {
+                        lstLoc.innerHTML = '<div class="text-red-500 p-3 text-center">Error al consultar localidades.</div>';
+                    }
+                }
+
+                selMun.addEventListener('change', cargarLocalidades);
+                if (txtLoc) txtLoc.addEventListener('input', cargarLocalidades);
+            }
+        });
+        let dirSeleccionado = null;
+        let delSeleccionada = null;
+        let tempDirSeleccionado = null;
+        let tempDelSeleccionada = null;
+
+        // ==============================
+        // ESTADO DE SESIÓN DE TRABAJO (conectado al servidor)
+        // ==============================
+        let loteActualId = null;       // ID en tabla lotes_captura
+        let loteActualNombre = '';     // Nombre del lote (ej. "Lote 1")
+        let loteRutaRelativa = '';     // Ruta relativa dentro del disco
+        let listaPdfs = [];            // Lista de archivos [{ruta, nombre}]
+        let indiceActual = 0;          // Índice del PDF actual en la lista
+        let historialCapturas = [];    // Historial de nombres capturados para doble confirmación
+        let accionEnEspera = '';       // "Renombrar" o "Duplicar" (para confirmar)
+        let pdfFueRenombrado = false;  // Indica si el PDF actual fue renombrado
+
+        // Elementos del DOM
+        const btnModo = document.getElementById('btnModo');
+        const htmlEl = document.documentElement;
+        const btnPantallaCompleta = document.getElementById('btnPantallaCompleta');
+        const rbRegla1 = document.getElementById('rbRegla1');
+        const rbRegla2 = document.getElementById('rbRegla2');
+        const lblEstado = document.getElementById('lblEstado');
+        const txtNombre = document.getElementById('txtNombre');
+        const btnConfig = document.getElementById('btnConfig');
+        const btnInconsistencia = document.getElementById('btnInconsistencia');
+        const lblTotalPdf = document.getElementById('lblTotalPdf');
+
+        // Modales
+        const modalPinMaestro = document.getElementById('modalPinMaestro');
+        const txtPinMaestro = document.getElementById('txtPinMaestro');
+        const btnPinCancelar = document.getElementById('btnPinCancelar');
+        const btnPinAceptar = document.getElementById('btnPinAceptar');
+
+        const modalSeleccionSesion = document.getElementById('modalSeleccionSesion');
+        const lblUsuarioSesion = document.getElementById('lblUsuarioSesion');
+        const btnSesionRefrescar = document.getElementById('btnSesionRefrescar');
+        const btnSesionCancelar = document.getElementById('btnSesionCancelar');
+        const btnComenzar = document.getElementById('btnComenzar');
+
+        // ==================================================
+        // LOGICA PIN MAESTRO (DESACTIVADO: ACCESO DIRECTO)
+        // ==================================================
+        function solicitarPinMaestro() {
+            return Promise.resolve(true);
+        }
+
+        function procesarPin() {
+            modalPinMaestro.classList.add('hidden');
+            if (pinResolve) pinResolve(true);
+        }
+
+        function cancelarPin() {
+            modalPinMaestro.classList.add('hidden');
+            if (pinResolve) pinResolve(true);
+        }
+
+        btnPinAceptar.addEventListener('click', procesarPin);
+        txtPinMaestro.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                procesarPin();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelarPin();
+            }
+        });
+        btnPinCancelar.addEventListener('click', cancelarPin);
+
+        // ==================================================
+        // LOGICA CONFIRMACIÓN Y ALERTAS
+        // ==================================================
+        let confirmacionResolve = null;
+
+        function solicitarConfirmacion(titulo, mensaje, icono = 'fa-circle-question', colorIcono = 'text-brand', mostrarCancelar = true) {
+            return new Promise((resolve) => {
+                confirmacionResolve = resolve;
+                document.getElementById('lblConfirmacionTitulo').innerText = titulo;
+                document.getElementById('lblConfirmacionMensaje').innerText = mensaje;
+
+                const iconoEl = document.getElementById('iconConfirmacion');
+                iconoEl.className = `fa-solid ${icono} ${colorIcono} text-2xl`;
+
+                const btnCancelar = document.getElementById('btnConfirmarCancelar');
+                if (mostrarCancelar) {
+                    btnCancelar.classList.remove('hidden');
+                } else {
+                    btnCancelar.classList.add('hidden');
+                }
+
+                document.getElementById('modalConfirmacion').classList.remove('hidden');
+            });
+        }
+
+        document.getElementById('btnConfirmarAceptar').addEventListener('click', () => {
+            document.getElementById('modalConfirmacion').classList.add('hidden');
+            if (confirmacionResolve) confirmacionResolve(true);
+        });
+
+        document.getElementById('btnConfirmarCancelar').addEventListener('click', () => {
+            document.getElementById('modalConfirmacion').classList.add('hidden');
+            if (confirmacionResolve) confirmacionResolve(false);
+        });
+
+        // ==================================================
+        // SELECCIÓN DE SESIÓN
+        // ==================================================
+         function abrirSeleccionSesion() {
+             lblUsuarioSesion.innerText = "Usuario: " + usuarioNombre;
+             tempDirSeleccionado = null;
+             tempDelSeleccionada = null;
+             btnComenzar.disabled = true;
+             document.getElementById('lblEstadoConexion').innerText = "Seleccione un directorio de trabajo.";
+             document.getElementById('lblEstadoConexion').className = "text-sm font-semibold text-gray-500";
+ 
+             renderDirectorios();
+             document.getElementById('lstDelegaciones').innerHTML = '<div class="text-gray-400 text-sm p-4 text-center">Seleccione un directorio primero.</div>';
+ 
+             modalSeleccionSesion.classList.remove('hidden');
+         }
+
+        /**
+         * Renderiza dinámicamente la lista de directorios configurados en el panel izquierdo
+         * del modal de selección de sesión de trabajo.
+         */
+        function renderDirectorios() {
+            const lst = document.getElementById('lstDirectorios');
+            lst.innerHTML = '';
+            directoriosConfig.forEach(dir => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-between group rounded border-b border-gray-100 dark:border-gray-800";
+                btn.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-folder text-amber-500 text-lg"></i>
+                        <div>
+                            <span class="font-bold block text-sm text-gray-800 dark:text-gray-200">${dir.nombre}</span>
+                            <span class="text-xs text-gray-500 font-mono">${dir.ruta}</span>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-300 group-hover:text-gray-500 transition-colors"></i>
+                `;
+                btn.addEventListener('click', () => selectDirectorio(dir, btn));
+                lst.appendChild(btn);
+            });
+        }
+
+        /**
+         * Maneja la selección de un directorio de trabajo específico.
+         * Restablece la delegación activa y actualiza el estado de la conexión.
+         * 
+         * @param {object} dir - El directorio seleccionado.
+         * @param {HTMLElement} element - El botón HTML clickeado para aplicarle estilos de enfoque.
+         */
+        function selectDirectorio(dir, element) {
+            document.querySelectorAll('#lstDirectorios button').forEach(el => el.classList.remove('bg-brand/10', 'border-l-4', 'border-brand'));
+            element.classList.add('bg-brand/10', 'border-l-4', 'border-brand');
+
+            tempDirSeleccionado = dir;
+            tempDelSeleccionada = null;
+            btnComenzar.disabled = true;
+
+            const lblConexion = document.getElementById('lblEstadoConexion');
+            lblConexion.innerText = "Seleccione una delegación.";
+            lblConexion.className = "text-sm font-semibold text-gray-500";
+
+            renderDelegaciones();
+        }
+
+        /**
+         * Renderiza la lista de delegaciones disponibles en el panel derecho del modal
+         * una vez que se ha seleccionado un directorio de trabajo principal.
+         */
+        function renderDelegaciones() {
+            const lst = document.getElementById('lstDelegaciones');
+            lst.innerHTML = '';
+            catalogoDelegaciones.forEach(del => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors flex items-center justify-between group rounded border-b border-gray-100 dark:border-gray-800";
+                btn.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-building text-sky-500"></i>
+                        <div>
+                            <span class="font-semibold block text-sm text-gray-800 dark:text-gray-200">${del.nombre}</span>
+                            <span class="text-xs text-gray-500">Clave: ${del.clave}</span>
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-300 group-hover:text-gray-500 transition-colors"></i>
+                `;
+                btn.addEventListener('click', () => selectDelegacion(del, btn));
+                lst.appendChild(btn);
+            });
+        }
+
+        /**
+         * Maneja el evento de selección de una delegación.
+         * Confirma la conexión al directorio y habilita el botón de inicio de sesión.
+         * 
+         * @param {object} del - La delegación seleccionada.
+         * @param {HTMLElement} element - El botón HTML seleccionado para aplicarle estilos de enfoque.
+         */
+        function selectDelegacion(del, element) {
+            if (!tempDirSeleccionado) return;
+
+            document.querySelectorAll('#lstDelegaciones button').forEach(el => el.classList.remove('bg-brand/10', 'border-l-4', 'border-brand'));
+            element.classList.add('bg-brand/10', 'border-l-4', 'border-brand');
+
+            tempDelSeleccionada = del;
+
+            // Simulación de verificación de conexión del directorio
+            const lblConexion = document.getElementById('lblEstadoConexion');
+            lblConexion.innerText = `✔ Conexión exitosa a ${del.nombre}`;
+            lblConexion.className = "text-sm font-semibold text-green-600 dark:text-green-400";
+
+            btnComenzar.disabled = false;
+        }
+
+        btnComenzar.addEventListener('click', async () => {
+            if (!tempDirSeleccionado || !tempDelSeleccionada) return;
+
+            dirSeleccionado = tempDirSeleccionado;
+            delSeleccionada = tempDelSeleccionada;
+
+            // Guardar la configuración de sesión en localStorage
+            localStorage.setItem('val_ultimo_directorio_id', dirSeleccionado.id);
+            localStorage.setItem('val_ultima_delegacion_id', delSeleccionada.id);
+            localStorage.setItem('val_delegacion_nombre', delSeleccionada.nombre);
+            localStorage.setItem('val_delegacion_clave', delSeleccionada.clave);
+            localStorage.setItem('val_directorio_nombre', dirSeleccionado.nombre);
+
+            aplicarReglasDeDirectorio(dirSeleccionado);
+            modalSeleccionSesion.classList.add('hidden');
+
+            // Activar pantalla completa (requiere gesto de usuario)
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    const btnPC = document.getElementById('btnPantallaCompleta');
+                    if (btnPC) btnPC.innerHTML = '<i class="fa-solid fa-compress"></i> Ventana';
+                }).catch(() => {});
+            }
+
+            // Buscar lote libre en el servidor
+            await cargarLoteDesdeServidor();
+        });
+
+        // ==================================================
+        // CONTEXTO DE EJECUCIÓN PARA PROCESOS EXTERNOS
+        // ==================================================
+        const ctx = {
+            get listaPdfs() { return listaPdfs; },
+            set listaPdfs(v) { listaPdfs = v; },
+            get indiceActual() { return indiceActual; },
+            set indiceActual(v) { indiceActual = v; },
+            get dirSeleccionado() { return dirSeleccionado; },
+            set dirSeleccionado(v) { dirSeleccionado = v; },
+            get delSeleccionada() { return delSeleccionada; },
+            set delSeleccionada(v) { delSeleccionada = v; },
+            get loteActualId() { return loteActualId; },
+            set loteActualId(v) { loteActualId = v; },
+            get loteActualNombre() { return loteActualNombre; },
+            set loteActualNombre(v) { loteActualNombre = v; },
+            get loteRutaRelativa() { return loteRutaRelativa; },
+            set loteRutaRelativa(v) { loteRutaRelativa = v; },
+            get historialCapturas() { return historialCapturas; },
+            set historialCapturas(v) { historialCapturas = v; },
+            get accionEnEspera() { return accionEnEspera; },
+            set accionEnEspera(v) { accionEnEspera = v; },
+            get pdfFueRenombrado() { return pdfFueRenombrado; },
+            set pdfFueRenombrado(v) { pdfFueRenombrado = v; },
+
+            txtNombre: txtNombre,
+            lblEstado: lblEstado,
+            lblTotalPdf: lblTotalPdf,
+            rbRegla1: rbRegla1,
+            rbRegla2: rbRegla2,
+            nudPagina: document.getElementById('nudPagina'),
+            catalogoAnios: catalogoAnios,
+
+            solicitarPinMaestro: solicitarPinMaestro,
+            solicitarConfirmacion: solicitarConfirmacion,
+            abrirSeleccionSesion: abrirSeleccionSesion
+        };
+
+        // Redirigir la carga inicial de lote desde la sesión
+        async function cargarLoteDesdeServidor() {
+            await CapturaProcesos.cargarLoteDesdeServidor(ctx);
+        }
+
+        // Envoltura de validación para los listeners locales
+        function validarInput() {
+            return CapturaProcesos.validarInput(ctx);
+        }
+
+        btnSesionCancelar.addEventListener('click', () => {
+            modalSeleccionSesion.classList.add('hidden');
+        });
+
+        btnSesionRefrescar.addEventListener('click', () => {
+            tempDirSeleccionado = null;
+            tempDelSeleccionada = null;
+            btnComenzar.disabled = true;
+            document.getElementById('lblEstadoConexion').innerText = "Seleccione un directorio de trabajo.";
+            document.getElementById('lblEstadoConexion').className = "text-sm font-semibold text-gray-500";
+            renderDirectorios();
+            document.getElementById('lstDelegaciones').innerHTML = '<div class="text-gray-400 text-sm p-4 text-center">Seleccione un directorio primero.</div>';
+        });
+
+        function aplicarReglasDeDirectorio(dir) {
+            // Un-check visual de reglas
+            if (rbRegla1) rbRegla1.checked = false;
+            if (rbRegla2) rbRegla2.checked = false;
+
+            if (dir && dir.reglas) {
+                if (dir.reglas.includes('Regla1')) {
+                    if (rbRegla1) {
+                        rbRegla1.checked = true;
+                        rbRegla1.dispatchEvent(new Event('change'));
+                    }
+                } else if (dir.reglas.includes('Regla2')) {
+                    if (rbRegla2) {
+                        rbRegla2.checked = true;
+                        rbRegla2.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+        }
+
+        // Elementos del dropdown del engranaje
+        const dropdownConfig = document.getElementById('dropdownConfig');
+        const btnOptSesion = document.getElementById('btnOptSesion');
+        const btnOptReglas = document.getElementById('btnOptReglas');
+        const panelReglas = document.getElementById('panelReglas');
+
+        // Toggle del menú flotante de configuración (engranaje)
+        btnConfig.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownConfig.classList.toggle('hidden');
+        });
+
+        // Ocultar el dropdown al hacer clic fuera del mismo
+        document.addEventListener('click', () => {
+            dropdownConfig.classList.add('hidden');
+        });
+
+        // Opción del dropdown: Seleccionar Sesión (Sin solicitud de PIN)
+        btnOptSesion.addEventListener('click', () => {
+            abrirSeleccionSesion();
+        });
+
+        // Opción del dropdown: Mostrar u ocultar el panel izquierdo de Reglas 1 y 2
+        btnOptReglas.addEventListener('click', () => {
+            panelReglas.classList.toggle('invisible');
+            panelReglas.classList.toggle('pointer-events-none');
+        });
+
+        // Registrar triggers de botones y acciones del flujo
+        document.getElementById('btnRenombrar').addEventListener('click', () => CapturaProcesos.procesarRenombrar(ctx));
+        document.getElementById('btnDuplicar').addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
+        document.getElementById('btnLimpiar').addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
+        btnInconsistencia.addEventListener('click', () => CapturaProcesos.moverInconsistencia(ctx));
+        document.getElementById('btnMover').addEventListener('click', () => CapturaProcesos.moverSellos(ctx));
+        document.getElementById('btnRefrescar').addEventListener('click', () => {
+            const visor = document.getElementById("pdfViewer");
+            if (visor && visor.src && visor.src !== "about:blank" && visor.src !== "") {
+                let urlString = visor.src;
+                visor.src = "about:blank";
+                setTimeout(() => {
+                    try {
+                        const url = new URL(urlString);
+                        url.searchParams.set('t', Date.now());
+                        visor.src = url.toString();
+                    } catch (e) {
+                        const base = urlString.split('?')[0];
+                        const query = urlString.split('?')[1] || "";
+                        const params = new URLSearchParams(query);
+                        params.set('t', Date.now());
+                        visor.src = base + "?" + params.toString();
+                    }
+                }, 50);
+            } else {
+                if (ctx.listaPdfs && ctx.listaPdfs.length > 0 && ctx.indiceActual >= 0) {
+                    const pdf = ctx.listaPdfs[ctx.indiceActual];
+                    const url = CapturaArchivos.urlVerPdf(ctx.dirSeleccionado.id, pdf.ruta);
+                    visor.src = "about:blank";
+                    setTimeout(() => {
+                        visor.src = url + "&t=" + Date.now();
+                    }, 50);
+                }
+            }
+        });
+        document.getElementById('btnCerrarSesion').addEventListener('click', () => CapturaProcesos.cerrarSesion(ctx));
+
+        document.getElementById('btnRotarIzquierda').addEventListener('click', () => CapturaProcesos.rotarPagina(ctx, -90));
+        document.getElementById('btnRotarDerecha').addEventListener('click', () => CapturaProcesos.rotarPagina(ctx, 90));
+
+        // ==================================================
+        // SISTEMA DE SEGURIDAD PANTALLA COMPLETA
+        // ==================================================
+        btnPantallaCompleta.replaceWith(btnPantallaCompleta.cloneNode(true));
+        const btnPantallaCompletaNuevo = document.getElementById('btnPantallaCompleta');
+
+        btnPantallaCompletaNuevo.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+                btnPantallaCompletaNuevo.innerHTML = '<i class="fa-solid fa-expand"></i> Pantalla';
+            } else {
+                document.documentElement.requestFullscreen().then(() => {
+                    btnPantallaCompletaNuevo.innerHTML = '<i class="fa-solid fa-compress"></i> Ventana';
+                }).catch(err => {
+                    solicitarConfirmacion("Pantalla Completa", "Error al activar pantalla completa: " + err.message, "fa-triangle-exclamation", "text-red-500", false);
+                });
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            const btnPC = document.getElementById('btnPantallaCompleta');
+            if (btnPC) {
+                if (document.fullscreenElement) {
+                    btnPC.innerHTML = '<i class="fa-solid fa-compress"></i> Ventana';
+                } else {
+                    btnPC.innerHTML = '<i class="fa-solid fa-expand"></i> Pantalla';
+                }
+            }
+        });
+
+        // ==================================================
+        // COMPORTAMIENTOS ORIGINALES DEL USUARIO (CONSERVADOS Y OPTIMIZADOS)
+        // ==================================================
+        btnModo.addEventListener('click', () => {
+            if (htmlEl.classList.contains('dark')) {
+                htmlEl.classList.remove('dark');
+                htmlEl.classList.add('light');
+                btnModo.innerHTML = '<i class="fa-solid fa-moon"></i> Oscuro';
+            } else {
+                htmlEl.classList.remove('light');
+                htmlEl.classList.add('dark');
+                btnModo.innerHTML = '<i class="fa-solid fa-sun"></i> Claro';
+            }
+        });
+
+        if (rbRegla1) {
+            rbRegla1.addEventListener('change', () => {
+                if (rbRegla1.checked) {
+                    lblEstado.innerHTML = "Ejemplo: 01_2024_123456 (Folio de 1 a 6 dígitos)";
+                    txtNombre.maxLength = 14;
+                    validarInput();
+                }
+            });
+        }
+
+        if (rbRegla2) {
+            rbRegla2.addEventListener('change', () => {
+                if (rbRegla2.checked) {
+                    lblEstado.innerHTML = "Ejemplo: 01_01_01_01_00_00_2011_0090_00";
+                    txtNombre.maxLength = 100;
+                    validarInput();
+                }
+            });
+        }
+
+        txtNombre.addEventListener('paste', e => e.preventDefault());
+        txtNombre.addEventListener('copy', e => e.preventDefault());
+        txtNombre.addEventListener('cut', e => e.preventDefault());
+        txtNombre.addEventListener('contextmenu', e => e.preventDefault());
+        txtNombre.addEventListener('keypress', e => {
+            if (!/[0-9_\-]/.test(e.key) && e.key !== 'Enter') {
+                e.preventDefault();
+            }
+        });
+
+        let valorAnterior = "";
+        txtNombre.addEventListener('input', function (e) {
+            let val = this.value;
+            val = val.replace(/-/g, '_');
+
+            // Auto-guiones usando el módulo externo CapturaReglas
+            val = CapturaReglas.aplicarAutoGuiones(val, valorAnterior, rbRegla1 ? rbRegla1.checked : false, rbRegla2 ? rbRegla2.checked : false);
+
+            this.value = val;
+            valorAnterior = val;
+            validarInput();
+        });
+
+        // Escuchar Enter en el input de captura
+        txtNombre.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (accionEnEspera === 'Duplicar') {
+                    CapturaProcesos.procesarDuplicar(ctx);
+                } else {
+                    CapturaProcesos.procesarRenombrar(ctx);
+                }
+            }
+        });
+
+        // Escuchar la tecla Tab para atrapar el foco entre el input y los botones de captura
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                // Solo atrapar si hay un lote activo (sesión iniciada)
+                if (!loteActualId) return;
+
+                const input = document.getElementById('txtNombre');
+                const btnRenombrar = document.getElementById('btnRenombrar');
+                const btnDuplicar = document.getElementById('btnDuplicar');
+
+                // Obtener elementos habilitados del ciclo de captura
+                const elementosFoco = [];
+                if (input) elementosFoco.push(input);
+                if (btnRenombrar && !btnRenombrar.disabled) elementosFoco.push(btnRenombrar);
+                if (btnDuplicar && !btnDuplicar.disabled) elementosFoco.push(btnDuplicar);
+
+                if (elementosFoco.length === 0) return;
+
+                const indice = elementosFoco.indexOf(document.activeElement);
+
+                if (e.shiftKey) {
+                    // Shift + Tab: Navegar hacia atrás
+                    e.preventDefault();
+                    if (indice <= 0) {
+                        elementosFoco[elementosFoco.length - 1].focus();
+                    } else {
+                        elementosFoco[indice - 1].focus();
+                    }
+                } else {
+                    // Tab: Navegar hacia adelante
+                    e.preventDefault();
+                    if (indice === -1 || indice >= elementosFoco.length - 1) {
+                        elementosFoco[0].focus();
+                    } else {
+                        elementosFoco[indice + 1].focus();
+                    }
+                }
+            }
+        });
+
+        // Búsqueda completamente automática de lote al abrir la página (sin modal de selección)
+        window.addEventListener('DOMContentLoaded', () => {
+            const ultimoDirId = localStorage.getItem('val_ultimo_directorio_id');
+            const ultimaDelId = localStorage.getItem('val_ultima_delegacion_id');
+
+            const dir = directoriosConfig.find(d => d.id === ultimoDirId) || directoriosConfig[0] || { id: 'irec', nombre: 'IREC', ruta: '\\\\172.40.5.84\\irec', reglas: ['Regla1'] };
+            const del = catalogoDelegaciones.find(d => String(d.id) === String(ultimaDelId)) || null;
+
+            dirSeleccionado = dir;
+            delSeleccionada = del;
+            aplicarReglasDeDirectorio(dir);
+
+            // Iniciar búsqueda automática de lote inmediatamente
+            lblTotalPdf.innerText = del ? `${del.nombre} - Buscando lote automático...` : 'Buscando lote libre...';
+            CapturaProcesos.cargarLoteDesdeServidor(ctx);
+
+            // Activar pantalla completa al primer click (gesto requerido por el navegador)
+            document.addEventListener('click', function activarFullscreen() {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().then(() => {
+                        const btnPC = document.getElementById('btnPantallaCompleta');
+                        if (btnPC) btnPC.innerHTML = '<i class="fa-solid fa-compress"></i> Ventana';
+                    }).catch(() => {});
+                }
+                document.removeEventListener('click', activarFullscreen);
+            });
+        });
+    </script>
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ asset('sw.js') }}")
+                    .then(reg => console.log('Service Worker de Captura registrado:', reg.scope))
+                    .catch(err => console.error('Error al registrar el Service Worker:', err));
+            });
+        }
+    </script>
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
+        @csrf
+    </form>
+</body>
+
+</html>
