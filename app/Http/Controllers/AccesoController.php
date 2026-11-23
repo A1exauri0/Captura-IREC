@@ -11,18 +11,32 @@ use Spatie\Permission\Models\Role;
 
 class AccesoController extends Controller
 {
-    /**
-     * Vista unificada de Usuarios, Roles y Permisos.
-     */
-    public function index(Request $request)
+    // =========================================================
+    // VISTAS SEPARADAS: USUARIOS, ROLES Y PERMISOS
+    // =========================================================
+
+    public function usuarios()
     {
-        $tab = $request->query('tab', 'usuarios');
         $usuarios = User::with(['roles', 'turnoRelacion'])->orderBy('id')->get();
-        $roles = Role::with('permissions')->withCount('users')->orderBy('id')->get();
-        $permisos = Permission::withCount('roles')->orderBy('name')->get();
+        $roles = Role::orderBy('name')->get();
         $turnos = Turno::where('estatus', true)->orderBy('id')->get();
 
-        return view('configuracion.acceso_usuarios_roles', compact('tab', 'usuarios', 'roles', 'permisos', 'turnos'));
+        return view('configuracion.usuarios_index', compact('usuarios', 'roles', 'turnos'));
+    }
+
+    public function roles()
+    {
+        $roles = Role::with('permissions')->withCount('users')->orderBy('id')->get();
+        $permisos = Permission::orderBy('name')->get();
+
+        return view('configuracion.roles_index', compact('roles', 'permisos'));
+    }
+
+    public function permisos()
+    {
+        $permisos = Permission::withCount('roles')->orderBy('name')->get();
+
+        return view('configuracion.permisos_index', compact('permisos'));
     }
 
     // =========================================================
@@ -62,7 +76,7 @@ class AccesoController extends Controller
             $usuario->syncRoles($data['roles']);
         }
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'usuarios'])
+        return redirect()->route('admin.usuarios.index')
             ->with('success', "Usuario '{$usuario->name}' creado correctamente.");
     }
 
@@ -104,7 +118,7 @@ class AccesoController extends Controller
         $usuario->update($campos);
         $usuario->syncRoles($data['roles'] ?? []);
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'usuarios'])
+        return redirect()->route('admin.usuarios.index')
             ->with('success', "Usuario '{$usuario->name}' actualizado correctamente.");
     }
 
@@ -112,14 +126,14 @@ class AccesoController extends Controller
     {
         $usuario = User::findOrFail($id);
         if (auth()->id() === $usuario->id) {
-            return redirect()->route('admin.acceso.index', ['tab' => 'usuarios'])
+            return redirect()->route('admin.usuarios.index')
                 ->with('error', 'No puedes eliminar tu propio usuario activo.');
         }
 
         $nombre = $usuario->name;
         $usuario->delete();
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'usuarios'])
+        return redirect()->route('admin.usuarios.index')
             ->with('success', "Usuario '{$nombre}' eliminado correctamente.");
     }
 
@@ -143,7 +157,7 @@ class AccesoController extends Controller
             $role->syncPermissions($data['permissions']);
         }
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'roles'])
+        return redirect()->route('admin.roles.index')
             ->with('success', "Rol '{$role->name}' creado exitosamente.");
     }
 
@@ -159,7 +173,7 @@ class AccesoController extends Controller
         $role->update(['name' => trim($data['name'])]);
         $role->syncPermissions($data['permissions'] ?? []);
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'roles'])
+        return redirect()->route('admin.roles.index')
             ->with('success', "Rol '{$role->name}' y sus permisos actualizados.");
     }
 
@@ -167,14 +181,14 @@ class AccesoController extends Controller
     {
         $role = Role::findOrFail($id);
         if (strtolower($role->name) === 'superadmin') {
-            return redirect()->route('admin.acceso.index', ['tab' => 'roles'])
+            return redirect()->route('admin.roles.index')
                 ->with('error', 'El rol superadmin no puede ser eliminado.');
         }
 
         $nombre = $role->name;
         $role->delete();
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'roles'])
+        return redirect()->route('admin.roles.index')
             ->with('success', "Rol '{$nombre}' eliminado correctamente.");
     }
 
@@ -193,7 +207,7 @@ class AccesoController extends Controller
             'guard_name' => 'web',
         ]);
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'permisos'])
+        return redirect()->route('admin.permisos.index')
             ->with('success', "Permiso '{$permiso->name}' creado correctamente.");
     }
 
@@ -207,7 +221,7 @@ class AccesoController extends Controller
 
         $permiso->update(['name' => trim($data['name'])]);
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'permisos'])
+        return redirect()->route('admin.permisos.index')
             ->with('success', "Permiso actualizado a '{$permiso->name}'.");
     }
 
@@ -217,7 +231,7 @@ class AccesoController extends Controller
         $nombre = $permiso->name;
         $permiso->delete();
 
-        return redirect()->route('admin.acceso.index', ['tab' => 'permisos'])
+        return redirect()->route('admin.permisos.index')
             ->with('success', "Permiso '{$nombre}' eliminado correctamente.");
     }
 }

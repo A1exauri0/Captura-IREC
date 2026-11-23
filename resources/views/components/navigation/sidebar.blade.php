@@ -1,3 +1,13 @@
+@php
+    $menuPath = resource_path('data/sidebar_menu.json');
+    $menuSections = file_exists($menuPath)
+        ? json_decode(file_get_contents($menuPath), true)
+        : [];
+    if (!is_array($menuSections)) {
+        $menuSections = [];
+    }
+@endphp
+
 <aside id="app-sidebar">
     <!-- Brand Header -->
     <div class="px-4 py-3.5 border-b border-slate-800/80 d-flex align-items-center justify-content-between flex-shrink-0">
@@ -12,128 +22,88 @@
         </a>
     </div>
 
-    <!-- Navigation Links con Scroll Personalizado (sin barra nativa del navegador) -->
+    <!-- Navigation Links dinámicos desde JSON + Scroll Personalizado -->
     <div class="sidebar-scroll-wrapper flex-1 min-h-0">
         <nav id="sidebar-scroll-area" class="custom-scroll h-full overflow-y-auto px-3 py-4">
+            @foreach($menuSections as $section)
+                <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                    {{ $section['section'] ?? '' }}
+                </div>
+                <ul class="list-unstyled mb-4">
+                    @foreach(($section['items'] ?? []) as $idx => $item)
+                        @php
+                            $hasChildren = !empty($item['children']) && is_array($item['children']);
+                            $isActive = false;
+                            if ($hasChildren) {
+                                foreach ($item['children'] as $child) {
+                                    if (!empty($child['route']) && request()->routeIs($child['route'])) {
+                                        $isActive = true;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                $patterns = $item['active_routes'] ?? (!empty($item['route']) ? [$item['route']] : []);
+                                foreach ($patterns as $pat) {
+                                    if (request()->routeIs($pat)) {
+                                        $isActive = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            $submenuId = $item['id'] ?? ('submenu-' . $loop->parent->index . '-' . $idx);
+                        @endphp
 
-            <!-- 1. OPERACIÓN -->
-            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
-                Operación
-            </div>
-            <ul class="list-unstyled mb-4">
-                <li class="mb-1">
-                    <a href="{{ route('admin.captura.index') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.captura.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-desktop w-5 text-center mr-2.5 {{ request()->routeIs('admin.captura.*') ? 'text-white' : 'text-sky-400' }}"></i>
-                        <span>Estación de Captura</span>
-                    </a>
-                </li>
-            </ul>
-
-            <!-- 2. TIEMPO REAL -->
-            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
-                Tiempo Real
-            </div>
-            <ul class="list-unstyled mb-4">
-                <li class="mb-1">
-                    <a href="{{ route('admin.analytics_sellos.reportes.lotes_trabajando') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.lotes_trabajando') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-satellite-dish w-5 text-center mr-2.5 {{ request()->routeIs('admin.analytics_sellos.reportes.lotes_trabajando') ? 'text-white' : 'text-emerald-400' }}"></i>
-                        <span>Sesiones Activas</span>
-                        <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" style="font-size: 0.6rem;">LIVE</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="{{ route('admin.autorizaciones.index') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.autorizaciones.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-shield-halved w-5 text-center mr-2.5 {{ request()->routeIs('admin.autorizaciones.*') ? 'text-white' : 'text-amber-400' }}"></i>
-                        <span>Autorizaciones</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="{{ route('admin.analytics_sellos.reportes.buscar_archivos') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.buscar_archivos') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-magnifying-glass w-5 text-center mr-2.5 {{ request()->routeIs('admin.analytics_sellos.reportes.buscar_archivos') ? 'text-white' : 'text-sky-400' }}"></i>
-                        <span>Explorador PDF</span>
-                    </a>
-                </li>
-            </ul>
-
-            <!-- 3. ANALÍTICAS (Unificado con pestañas superiores por tipo de documento) -->
-            @php
-                $enIndicadores = request()->routeIs(
-                    'admin.analytics_capturas.reportes.index',
-                    'admin.analytics_sellos.reportes.index',
-                    'admin.analytics_digitalizacion.reportes.capturas',
-                    'admin.analytics_catastro.reportes.index'
-                );
-                $enProductividad = request()->routeIs(
-                    'admin.analytics_capturas.reportes.usuarios',
-                    'admin.analytics_sellos.reportes.usuarios',
-                    'admin.analytics_digitalizacion.reportes.reportes_capturas_notarias',
-                    'admin.analytics_catastro.reportes.usuarios'
-                );
-                $enBitacoras = request()->routeIs(
-                    'admin.analytics_capturas.reportes.detalles_renombre',
-                    'admin.analytics_sellos.reportes.detalles_renombre',
-                    'admin.analytics_digitalizacion.reportes.detalles_renombre',
-                    'admin.analytics_catastro.reportes.detalles_renombre'
-                );
-            @endphp
-            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
-                Analíticas & Bitácora
-            </div>
-            <ul class="list-unstyled mb-4">
-                <li class="mb-1">
-                    <a href="{{ route('admin.analytics_capturas.reportes.index') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $enIndicadores ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-chart-pie w-5 text-center mr-2.5 {{ $enIndicadores ? 'text-white' : 'text-indigo-400' }}"></i>
-                        <span>Indicadores KPI</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="{{ route('admin.analytics_capturas.reportes.usuarios') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $enProductividad ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-user-chart w-5 text-center mr-2.5 {{ $enProductividad ? 'text-white' : 'text-emerald-400' }}"></i>
-                        <span>Productividad</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="{{ route('admin.analytics_capturas.reportes.detalles_renombre') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $enBitacoras ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-clock-rotate-left w-5 text-center mr-2.5 {{ $enBitacoras ? 'text-white' : 'text-teal-400' }}"></i>
-                        <span>Bitácoras</span>
-                    </a>
-                </li>
-            </ul>
-
-            <!-- 4. ADMINISTRACIÓN -->
-            <div class="px-2.5 mb-1.5 text-slate-500 font-weight-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08em;">
-                Administración
-            </div>
-            <ul class="list-unstyled mb-2">
-                <li class="mb-1">
-                    <a href="{{ route('admin.acceso.index') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.acceso.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-users-gear w-5 text-center mr-2.5 {{ request()->routeIs('admin.acceso.*') ? 'text-white' : 'text-sky-400' }}"></i>
-                        <span>Usuarios y Roles</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="{{ route('admin.turnos.index') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.turnos.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-user-clock w-5 text-center mr-2.5 {{ request()->routeIs('admin.turnos.*') ? 'text-white' : 'text-amber-400' }}"></i>
-                        <span>Turnos</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="{{ route('admin.catalogos.index') }}"
-                       class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.catalogos.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
-                        <i class="fa-solid fa-folder-tree w-5 text-center mr-2.5 {{ request()->routeIs('admin.catalogos.*') ? 'text-white' : 'text-rose-400' }}"></i>
-                        <span>Catálogos y Rutas</span>
-                    </a>
-                </li>
-            </ul>
+                        @if($hasChildren)
+                            <li class="mb-1">
+                                <button type="button"
+                                        data-submenu-toggle="{{ $submenuId }}"
+                                        aria-expanded="{{ $isActive ? 'true' : 'false' }}"
+                                        class="w-100 border-0 bg-transparent d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left {{ $isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}"
+                                        style="cursor: pointer; outline: none;">
+                                    <i class="{{ $item['icon'] ?? 'fa-solid fa-circle' }} w-5 text-center mr-2.5 {{ $isActive ? 'text-sky-400' : ($item['icon_color'] ?? 'text-slate-400') }}"></i>
+                                    <span class="flex-1">{{ $item['label'] }}</span>
+                                    <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform duration-200 submenu-arrow"
+                                       style="transform: rotate({{ $isActive ? '180deg' : '0deg' }});"></i>
+                                </button>
+                                <ul id="{{ $submenuId }}"
+                                    class="list-unstyled mt-1 mb-1 pl-3 ml-3 border-l border-slate-700/70 {{ $isActive ? '' : 'd-none' }}">
+                                    @foreach($item['children'] as $child)
+                                        @php
+                                            $childRoute = $child['route'] ?? null;
+                                            $childActive = $childRoute && request()->routeIs($childRoute);
+                                            $childHref = ($childRoute && Route::has($childRoute)) ? route($childRoute) : '#';
+                                        @endphp
+                                        <li class="mb-0.5">
+                                            <a href="{{ $childHref }}"
+                                               class="d-flex align-items-center px-2.5 py-1.5 rounded-md text-xs font-medium text-decoration-none transition-colors {{ $childActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-800/70 hover:text-white' }}">
+                                                <i class="{{ $child['icon'] ?? 'fa-solid fa-angle-right' }} w-4 text-center mr-2 {{ $childActive ? 'text-white' : 'text-slate-500' }}"></i>
+                                                <span>{{ $child['label'] }}</span>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </li>
+                        @else
+                            @php
+                                $itemRoute = $item['route'] ?? null;
+                                $itemHref = ($itemRoute && Route::has($itemRoute)) ? route($itemRoute) : '#';
+                            @endphp
+                            <li class="mb-1">
+                                <a href="{{ $itemHref }}"
+                                   class="d-flex align-items-center px-3 py-2 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ $isActive ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}">
+                                    <i class="{{ $item['icon'] ?? 'fa-solid fa-circle' }} w-5 text-center mr-2.5 {{ $isActive ? 'text-white' : ($item['icon_color'] ?? 'text-slate-400') }}"></i>
+                                    <span>{{ $item['label'] }}</span>
+                                    @if(!empty($item['badge']))
+                                        <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded {{ $item['badge_class'] ?? 'bg-sky-500/20 text-sky-300' }}" style="font-size: 0.6rem;">
+                                            {{ $item['badge'] }}
+                                        </span>
+                                    @endif
+                                </a>
+                            </li>
+                        @endif
+                    @endforeach
+                </ul>
+            @endforeach
         </nav>
 
         <!-- Barra de scroll personalizada tipo overlay -->
@@ -145,6 +115,28 @@
     document.addEventListener('DOMContentLoaded', function () {
         const area = document.getElementById('sidebar-scroll-area');
         const thumb = document.getElementById('sidebar-scroll-thumb');
+
+        // Submenús desplegables del sidebar
+        document.querySelectorAll('[data-submenu-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const targetId = this.getAttribute('data-submenu-toggle');
+                const submenu = document.getElementById(targetId);
+                const arrow = this.querySelector('.submenu-arrow');
+                if (!submenu) return;
+
+                const isHidden = submenu.classList.contains('d-none');
+                submenu.classList.toggle('d-none', !isHidden);
+                this.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                if (arrow) {
+                    arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+                }
+                if (typeof window.__updateSidebarThumb === 'function') {
+                    window.__updateSidebarThumb();
+                }
+            });
+        });
+
+        // Scroll personalizado (sin barra nativa del navegador)
         if (!area || !thumb) return;
 
         let hideTimer = null;
@@ -162,6 +154,7 @@
             thumb.style.height = thumbHeight + 'px';
             thumb.style.transform = 'translateY(' + (scrollRatio * maxTop) + 'px)';
         }
+        window.__updateSidebarThumb = updateThumb;
 
         function showThumb() {
             updateThumb();

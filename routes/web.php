@@ -6,13 +6,14 @@ use App\Http\Controllers\CapturaController;
 use App\Http\Controllers\ReportesCapturasController;
 use App\Http\Controllers\AuditoriaSellosController;
 use App\Http\Controllers\AuditoriaCatastroController;
-use App\Http\Controllers\NotariasController;
 use App\Http\Controllers\TurnoController;
 use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\PeticionAutorizacionController;
 use App\Http\Controllers\AccesoController;
 
-// Autenticación
+// =========================================================================
+// AUTENTICACIÓN
+// =========================================================================
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -20,123 +21,149 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/', function () {
+        $user = auth()->user();
+        if ($user && $user->hasRole(['Captura', 'Digitalizador']) && !$user->hasRole(['superadmin', 'administrador'])) {
+            return redirect()->route('admin.captura.index');
+        }
         return redirect()->route('admin.analytics_sellos.reportes.lotes_trabajando');
     })->name('admin.index');
 
-    // 1. ESTACIÓN DE CAPTURA WEB
-    Route::name('admin.captura.')->prefix('captura')->group(function () {
-        Route::get('/', [CapturaController::class, 'index'])->name('index');
-        Route::get('/buscar-lote', [CapturaController::class, 'buscarLote'])->name('buscarLote');
-        Route::get('/ver-pdf', [CapturaController::class, 'verPdf'])->name('verPdf');
-        Route::get('/localidades', [CapturaController::class, 'obtenerLocalidades'])->name('localidades');
-        Route::post('/renombrar', [CapturaController::class, 'renombrar'])->name('renombrar');
-        Route::post('/validar', [CapturaController::class, 'validar'])->name('validar');
-        Route::post('/duplicar', [CapturaController::class, 'duplicar'])->name('duplicar');
-        Route::post('/inconsistencia', [CapturaController::class, 'inconsistencia'])->name('inconsistencia');
-        Route::post('/mover-sellos', [CapturaController::class, 'moverSellos'])->name('moverSellos');
-        Route::post('/rotar', [CapturaController::class, 'rotar'])->name('rotar');
-        Route::post('/liberar-lote', [CapturaController::class, 'liberarLote'])->name('liberarLote');
-        Route::post('/auditoria', [CapturaController::class, 'auditoria'])->name('auditoria');
+    // =========================================================================
+    // SECCIÓN 1: RUTAS PARA CAPTURISTAS (/captura)
+    // =========================================================================
+    Route::prefix('captura')->group(function () {
+
+        // Estación de captura y validación de PDFs
+        Route::name('admin.captura.')->group(function () {
+            Route::get('/', [CapturaController::class, 'index'])->name('index');
+            Route::get('/buscar-lote', [CapturaController::class, 'buscarLote'])->name('buscarLote');
+            Route::get('/ver-pdf', [CapturaController::class, 'verPdf'])->name('verPdf');
+            Route::get('/localidades', [CapturaController::class, 'obtenerLocalidades'])->name('localidades');
+            Route::post('/renombrar', [CapturaController::class, 'renombrar'])->name('renombrar');
+            Route::post('/validar', [CapturaController::class, 'validar'])->name('validar');
+            Route::post('/duplicar', [CapturaController::class, 'duplicar'])->name('duplicar');
+            Route::post('/inconsistencia', [CapturaController::class, 'inconsistencia'])->name('inconsistencia');
+            Route::post('/mover-sellos', [CapturaController::class, 'moverSellos'])->name('moverSellos');
+            Route::post('/rotar', [CapturaController::class, 'rotar'])->name('rotar');
+            Route::post('/liberar-lote', [CapturaController::class, 'liberarLote'])->name('liberarLote');
+            Route::post('/auditoria', [CapturaController::class, 'auditoria'])->name('auditoria');
+        });
+
+        // Peticiones de autorización enviadas desde la estación del capturista
+        Route::post('/autorizaciones/solicitar', [PeticionAutorizacionController::class, 'solicitar'])
+            ->name('admin.autorizaciones.solicitar');
+        Route::get('/autorizaciones/{id}/estado', [PeticionAutorizacionController::class, 'estado'])
+            ->name('admin.autorizaciones.estado');
     });
 
-    // 2. CENTRO DE AUTORIZACIONES EN TIEMPO REAL (Reemplaza a PinAutorizacion)
-    Route::name('admin.autorizaciones.')->prefix('autorizaciones')->group(function () {
-        Route::get('/', [PeticionAutorizacionController::class, 'index'])->name('index');
-        Route::post('/listar', [PeticionAutorizacionController::class, 'listar'])->name('listar');
-        Route::post('/solicitar', [PeticionAutorizacionController::class, 'solicitar'])->name('solicitar');
-        Route::get('/{id}/estado', [PeticionAutorizacionController::class, 'estado'])->name('estado');
-        Route::post('/{id}/resolver', [PeticionAutorizacionController::class, 'resolver'])->name('resolver');
-    });
+    // =========================================================================
+    // SECCIÓN 2: RUTAS PARA ADMINISTRACIÓN Y SUPERVISIÓN (/admin)
+    // =========================================================================
+    Route::prefix('admin')->group(function () {
 
-    // 3. INDICADORES Y PRODUCTIVIDAD: REGISTROS (auditoria_registros)
-    Route::name('admin.analytics_capturas.reportes.')->prefix('panel_control/analytics_capturas/reportes')->group(function () {
-        Route::get('/index', [ReportesCapturasController::class, 'index_capturas'])->name('index');
-        Route::get('/usuarios', [ReportesCapturasController::class, 'index_reportes_capturas'])->name('usuarios');
-        Route::post('/dashboard_capturas', [ReportesCapturasController::class, 'dashboard_capturas'])->name('dashboard_capturas');
-        Route::post('/descargar_excel', [ReportesCapturasController::class, 'descargar_excel'])->name('descargar_excel');
-        Route::post('/descargar_excel_resumen', [ReportesCapturasController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
-        Route::post('/descargar_excel_general', [ReportesCapturasController::class, 'descargar_excel_general'])->name('descargar_excel_general');
-        Route::post('/descargar_excel_delegacion', [ReportesCapturasController::class, 'descargar_excel_delegacion'])->name('descargar_excel_delegacion');
-        Route::get('/detalles_renombre', [ReportesCapturasController::class, 'detalles_renombre_registros'])->name('detalles_renombre');
-    });
+        // Centro de autorizaciones en tiempo real (WebSockets)
+        Route::name('admin.autorizaciones.')->prefix('autorizaciones')->group(function () {
+            Route::get('/', [PeticionAutorizacionController::class, 'index'])->name('index');
+            Route::post('/listar', [PeticionAutorizacionController::class, 'listar'])->name('listar');
+            Route::post('/{id}/resolver', [PeticionAutorizacionController::class, 'resolver'])->name('resolver');
+        });
 
-    // 4. INDICADORES Y PRODUCTIVIDAD: NOTARÍAS (auditoria_notarias)
-    Route::name('admin.analytics_digitalizacion.reportes.')->prefix('panel_control/analytics_digitalizacion/reportes')->group(function () {
-        Route::get('/capturas', [ReportesCapturasController::class, 'index_capturas_notarias'])->name('capturas');
-        Route::get('/reportes_capturas_notarias', [ReportesCapturasController::class, 'index_reportes_capturas_notarias'])->name('reportes_capturas_notarias');
-        Route::post('/dashboard_capturas_notarias', [ReportesCapturasController::class, 'dashboard_capturas_notarias'])->name('dashboard_capturas_notarias');
-        Route::post('/descargar_excel_capturas_notarias', [ReportesCapturasController::class, 'descargar_excel_capturas_notarias'])->name('descargar_excel_capturas_notarias');
-        Route::post('/descargar_excel_general_notarias', [ReportesCapturasController::class, 'descargar_excel_general'])->name('descargar_excel_general_notarias');
-        Route::get('/detalles_renombre', [ReportesCapturasController::class, 'detalles_renombre_notarias'])->name('detalles_renombre');
-    });
+        // Indicadores, Productividad y Bitácora: REGISTROS
+        Route::name('admin.analytics_capturas.reportes.')->prefix('registros')->group(function () {
+            Route::get('/avance', [ReportesCapturasController::class, 'index_capturas'])->name('index');
+            Route::get('/productividad', [ReportesCapturasController::class, 'index_reportes_capturas'])->name('usuarios');
+            Route::get('/bitacora', [ReportesCapturasController::class, 'detalles_renombre_registros'])->name('detalles_renombre');
+            Route::post('/dashboard', [ReportesCapturasController::class, 'dashboard_capturas'])->name('dashboard_capturas');
+            Route::post('/descargar-excel', [ReportesCapturasController::class, 'descargar_excel'])->name('descargar_excel');
+            Route::post('/descargar-excel-resumen', [ReportesCapturasController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
+            Route::post('/descargar-excel-general', [ReportesCapturasController::class, 'descargar_excel_general'])->name('descargar_excel_general');
+            Route::post('/descargar-excel-delegacion', [ReportesCapturasController::class, 'descargar_excel_delegacion'])->name('descargar_excel_delegacion');
+        });
 
-    // 5. INDICADORES, PRODUCTIVIDAD, BITÁCORA, EXPLORADOR GLOBAL Y SESIONES EN VIVO: SELLOS (auditoria_sellos)
-    Route::name('admin.analytics_sellos.reportes.')->prefix('panel_control/analytics_sellos/reportes')->group(function () {
-        Route::get('/index', [AuditoriaSellosController::class, 'index_capturas'])->name('index');
-        Route::get('/usuarios', [AuditoriaSellosController::class, 'index_reportes_capturas'])->name('usuarios');
-        Route::post('/dashboard_sellos', [AuditoriaSellosController::class, 'dashboard_sellos'])->name('dashboard_sellos');
-        Route::post('/descargar_excel', [AuditoriaSellosController::class, 'descargar_excel'])->name('descargar_excel');
-        Route::post('/descargar_excel_resumen', [AuditoriaSellosController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
-        Route::post('/descargar_excel_delegaciones', [AuditoriaSellosController::class, 'descargar_excel_delegaciones'])->name('descargar_excel_delegaciones');
-        Route::post('/descargar_excel_dias', [AuditoriaSellosController::class, 'descargar_excel_dias'])->name('descargar_excel_dias');
-        Route::get('/detalles_renombre', [AuditoriaSellosController::class, 'detalles_renombre'])->name('detalles_renombre');
-        Route::get('/ver_pdf/{id}', [AuditoriaSellosController::class, 'ver_pdf'])->name('ver_pdf');
-        Route::post('/editar_renombre', [AuditoriaSellosController::class, 'editar_renombre'])->name('editar_renombre');
-        Route::post('/regresar_pdf', [AuditoriaSellosController::class, 'regresar_pdf'])->name('regresar_pdf');
-        Route::post('/regresar_pdf_lote', [AuditoriaSellosController::class, 'regresar_pdf_lote'])->name('regresar_pdf_lote');
-        Route::post('/reasignar_registros_kpi', [AuditoriaSellosController::class, 'reasignar_registros_kpi'])->name('reasignar_registros_kpi');
+        // Indicadores, Productividad y Bitácora: NOTARÍAS
+        Route::name('admin.analytics_digitalizacion.reportes.')->prefix('notarias')->group(function () {
+            Route::get('/avance', [ReportesCapturasController::class, 'index_capturas_notarias'])->name('capturas');
+            Route::get('/productividad', [ReportesCapturasController::class, 'index_reportes_capturas_notarias'])->name('reportes_capturas_notarias');
+            Route::get('/bitacora', [ReportesCapturasController::class, 'detalles_renombre_notarias'])->name('detalles_renombre');
+            Route::post('/dashboard', [ReportesCapturasController::class, 'dashboard_capturas_notarias'])->name('dashboard_capturas_notarias');
+            Route::post('/descargar-excel', [ReportesCapturasController::class, 'descargar_excel_capturas_notarias'])->name('descargar_excel_capturas_notarias');
+            Route::post('/descargar-excel-general', [ReportesCapturasController::class, 'descargar_excel_general'])->name('descargar_excel_general_notarias');
+        });
 
-        // Explorador Global de Archivos PDF
-        Route::get('/buscar_archivos', [AuditoriaSellosController::class, 'index_buscar_archivos'])->name('buscar_archivos');
-        Route::post('/obtener_busqueda_archivos', [AuditoriaSellosController::class, 'obtener_busqueda_archivos'])->name('obtener_busqueda_archivos');
+        // Indicadores, Productividad, Bitácora, Explorador y Sesiones en Vivo: SELLOS
+        Route::name('admin.analytics_sellos.reportes.')->prefix('sellos')->group(function () {
+            Route::get('/avance', [AuditoriaSellosController::class, 'index_capturas'])->name('index');
+            Route::get('/productividad', [AuditoriaSellosController::class, 'index_reportes_capturas'])->name('usuarios');
+            Route::get('/bitacora', [AuditoriaSellosController::class, 'detalles_renombre'])->name('detalles_renombre');
+            Route::post('/dashboard', [AuditoriaSellosController::class, 'dashboard_sellos'])->name('dashboard_sellos');
+            Route::post('/descargar-excel', [AuditoriaSellosController::class, 'descargar_excel'])->name('descargar_excel');
+            Route::post('/descargar-excel-resumen', [AuditoriaSellosController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
+            Route::post('/descargar-excel-delegaciones', [AuditoriaSellosController::class, 'descargar_excel_delegaciones'])->name('descargar_excel_delegaciones');
+            Route::post('/descargar-excel-dias', [AuditoriaSellosController::class, 'descargar_excel_dias'])->name('descargar_excel_dias');
+            Route::get('/ver-pdf/{id}', [AuditoriaSellosController::class, 'ver_pdf'])->name('ver_pdf');
+            Route::post('/editar-renombre', [AuditoriaSellosController::class, 'editar_renombre'])->name('editar_renombre');
+            Route::post('/regresar-pdf', [AuditoriaSellosController::class, 'regresar_pdf'])->name('regresar_pdf');
+            Route::post('/regresar-pdf-lote', [AuditoriaSellosController::class, 'regresar_pdf_lote'])->name('regresar_pdf_lote');
+            Route::post('/reasignar-kpi', [AuditoriaSellosController::class, 'reasignar_registros_kpi'])->name('reasignar_registros_kpi');
 
-        // Sesiones y Lotes Activos en Tiempo Real (WebSockets)
-        Route::get('/lotes_trabajando', [AuditoriaSellosController::class, 'index_lotes_trabajando'])->name('lotes_trabajando');
-        Route::post('/obtener_lotes_trabajando', [AuditoriaSellosController::class, 'obtener_lotes_trabajando'])->name('obtener_lotes_trabajando');
-        Route::post('/eliminar_lote_trabajando', [AuditoriaSellosController::class, 'eliminar_lote_trabajando'])->name('eliminar_lote_trabajando');
-    });
+            // Explorador Global de Archivos PDF
+            Route::get('/buscar-archivos', [AuditoriaSellosController::class, 'index_buscar_archivos'])->name('buscar_archivos');
+            Route::post('/obtener-busqueda-archivos', [AuditoriaSellosController::class, 'obtener_busqueda_archivos'])->name('obtener_busqueda_archivos');
 
-    // 6. INDICADORES, PRODUCTIVIDAD Y BITÁCORA: CATASTRO (auditoria_catastro)
-    Route::name('admin.analytics_catastro.reportes.')->prefix('panel_control/analytics_catastro/reportes')->group(function () {
-        Route::get('/index', [AuditoriaCatastroController::class, 'index_capturas'])->name('index');
-        Route::get('/usuarios', [AuditoriaCatastroController::class, 'index_reportes_capturas'])->name('usuarios');
-        Route::post('/dashboard_catastro', [AuditoriaCatastroController::class, 'dashboard_catastro'])->name('dashboard_catastro');
-        Route::post('/descargar_excel', [AuditoriaCatastroController::class, 'descargar_excel'])->name('descargar_excel');
-        Route::post('/descargar_excel_resumen', [AuditoriaCatastroController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
-        Route::post('/descargar_excel_municipios', [AuditoriaCatastroController::class, 'descargar_excel_municipios'])->name('descargar_excel_municipios');
-        Route::post('/descargar_excel_dias', [AuditoriaCatastroController::class, 'descargar_excel_dias'])->name('descargar_excel_dias');
-        Route::get('/detalles_renombre', [AuditoriaCatastroController::class, 'detalles_renombre'])->name('detalles_renombre');
-        Route::get('/ver_pdf/{id}', [AuditoriaCatastroController::class, 'ver_pdf'])->name('ver_pdf');
-        Route::post('/editar_renombre', [AuditoriaCatastroController::class, 'editar_renombre'])->name('editar_renombre');
-    });
+            // Sesiones y Lotes Activos en Tiempo Real (WebSockets)
+            Route::get('/sesiones-activas', [AuditoriaSellosController::class, 'index_lotes_trabajando'])->name('lotes_trabajando');
+            Route::post('/obtener-sesiones-activas', [AuditoriaSellosController::class, 'obtener_lotes_trabajando'])->name('obtener_lotes_trabajando');
+            Route::post('/eliminar-sesion-activa', [AuditoriaSellosController::class, 'eliminar_lote_trabajando'])->name('eliminar_lote_trabajando');
+        });
 
-    // 7. CRUD DE TURNOS ADAPTATIVOS Y ASIGNACIÓN DE CAPTURISTAS
-    Route::name('admin.turnos.')->prefix('turnos')->group(function () {
-        Route::get('/', [TurnoController::class, 'index'])->name('index');
-        Route::post('/', [TurnoController::class, 'store'])->name('store');
-        Route::put('/{id}', [TurnoController::class, 'update'])->name('update');
-        Route::delete('/{id}', [TurnoController::class, 'destroy'])->name('destroy');
-        Route::post('/asignar', [TurnoController::class, 'asignarUsuarios'])->name('asignar');
-    });
+        // Indicadores, Productividad y Bitácora: CATASTRO
+        Route::name('admin.analytics_catastro.reportes.')->prefix('catastro')->group(function () {
+            Route::get('/avance', [AuditoriaCatastroController::class, 'index_capturas'])->name('index');
+            Route::get('/productividad', [AuditoriaCatastroController::class, 'index_reportes_capturas'])->name('usuarios');
+            Route::get('/bitacora', [AuditoriaCatastroController::class, 'detalles_renombre'])->name('detalles_renombre');
+            Route::post('/dashboard', [AuditoriaCatastroController::class, 'dashboard_catastro'])->name('dashboard_catastro');
+            Route::post('/descargar-excel', [AuditoriaCatastroController::class, 'descargar_excel'])->name('descargar_excel');
+            Route::post('/descargar-excel-resumen', [AuditoriaCatastroController::class, 'descargar_excel_resumen'])->name('descargar_excel_resumen');
+            Route::post('/descargar-excel-municipios', [AuditoriaCatastroController::class, 'descargar_excel_municipios'])->name('descargar_excel_municipios');
+            Route::post('/descargar-excel-dias', [AuditoriaCatastroController::class, 'descargar_excel_dias'])->name('descargar_excel_dias');
+            Route::get('/ver-pdf/{id}', [AuditoriaCatastroController::class, 'ver_pdf'])->name('ver_pdf');
+            Route::post('/editar-renombre', [AuditoriaCatastroController::class, 'editar_renombre'])->name('editar_renombre');
+        });
 
-    // 8. CATÁLOGOS (DELEGACIONES, MUNICIPIOS, LOCALIDADES Y RUTAS PDF)
-    Route::name('admin.catalogos.')->prefix('catalogos')->group(function () {
-        Route::get('/', [CatalogoController::class, 'index'])->name('index');
-    });
+        // CRUDs separados de Control de Acceso: Usuarios, Roles y Permisos
+        Route::name('admin.usuarios.')->prefix('usuarios')->group(function () {
+            Route::get('/', [AccesoController::class, 'usuarios'])->name('index');
+            Route::post('/', [AccesoController::class, 'storeUser'])->name('store');
+            Route::put('/{id}', [AccesoController::class, 'updateUser'])->name('update');
+            Route::delete('/{id}', [AccesoController::class, 'destroyUser'])->name('destroy');
+        });
 
-    // 9. CRUD UNIFICADO DE USUARIOS, ROLES Y PERMISOS
-    Route::name('admin.acceso.')->prefix('acceso')->group(function () {
-        Route::get('/', [AccesoController::class, 'index'])->name('index');
-        Route::post('/usuarios', [AccesoController::class, 'storeUser'])->name('usuarios.store');
-        Route::put('/usuarios/{id}', [AccesoController::class, 'updateUser'])->name('usuarios.update');
-        Route::delete('/usuarios/{id}', [AccesoController::class, 'destroyUser'])->name('usuarios.destroy');
+        Route::name('admin.roles.')->prefix('roles')->group(function () {
+            Route::get('/', [AccesoController::class, 'roles'])->name('index');
+            Route::post('/', [AccesoController::class, 'storeRole'])->name('store');
+            Route::put('/{id}', [AccesoController::class, 'updateRole'])->name('update');
+            Route::delete('/{id}', [AccesoController::class, 'destroyRole'])->name('destroy');
+        });
 
-        Route::post('/roles', [AccesoController::class, 'storeRole'])->name('roles.store');
-        Route::put('/roles/{id}', [AccesoController::class, 'updateRole'])->name('roles.update');
-        Route::delete('/roles/{id}', [AccesoController::class, 'destroyRole'])->name('roles.destroy');
+        Route::name('admin.permisos.')->prefix('permisos')->group(function () {
+            Route::get('/', [AccesoController::class, 'permisos'])->name('index');
+            Route::post('/', [AccesoController::class, 'storePermission'])->name('store');
+            Route::put('/{id}', [AccesoController::class, 'updatePermission'])->name('update');
+            Route::delete('/{id}', [AccesoController::class, 'destroyPermission'])->name('destroy');
+        });
 
-        Route::post('/permisos', [AccesoController::class, 'storePermission'])->name('permisos.store');
-        Route::put('/permisos/{id}', [AccesoController::class, 'updatePermission'])->name('permisos.update');
-        Route::delete('/permisos/{id}', [AccesoController::class, 'destroyPermission'])->name('permisos.destroy');
+        // Turnos adaptativos
+        Route::name('admin.turnos.')->prefix('turnos')->group(function () {
+            Route::get('/', [TurnoController::class, 'index'])->name('index');
+            Route::post('/', [TurnoController::class, 'store'])->name('store');
+            Route::put('/{id}', [TurnoController::class, 'update'])->name('update');
+            Route::delete('/{id}', [TurnoController::class, 'destroy'])->name('destroy');
+            Route::post('/asignar', [TurnoController::class, 'asignarUsuarios'])->name('asignar');
+        });
+
+        // Catálogos y rutas PDF
+        Route::name('admin.catalogos.')->prefix('catalogos')->group(function () {
+            Route::get('/', [CatalogoController::class, 'index'])->name('index');
+        });
     });
 });
