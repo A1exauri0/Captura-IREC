@@ -8,7 +8,7 @@
 @section('contenido')
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3" style="gap: 8px;">
         <div class="d-flex flex-wrap" style="gap: 8px;">
-            @foreach(['registros' => 'Registros', 'sellos' => 'Sellos', 'notarias' => 'Notarías', 'catastro' => 'Catastro'] as $k => $lbl)
+            @foreach(['sellos' => 'Sellos' /* , 'registros' => 'Registros', 'notarias' => 'Notarías', 'catastro' => 'Catastro' */] as $k => $lbl)
                 <a href="{{ route('admin.colisiones.index', ['tipo' => $k, 'decision' => $decision]) }}"
                    class="btn btn-sm {{ $tipo === $k ? 'btn-primary' : 'btn-light border' }}"
                    style="{{ $tipo === $k ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">

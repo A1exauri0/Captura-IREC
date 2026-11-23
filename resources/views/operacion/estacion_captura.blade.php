@@ -38,14 +38,17 @@
         <div
             class="relative bg-gray-200 dark:bg-gray-800 px-8 py-6 min-h-[220px] flex items-start gap-12 transition-colors duration-200">
 
-            <!-- Bloque 1: Reglas -->
+            <!-- Bloque 1: Reglas (Solo Sellos activo temporalmente) -->
             <div id="panelReglas" class="flex flex-col gap-3 min-w-[180px] mt-2">
+                {{-- Temporalmente oculto: solo se trabaja con Sellos
                 <label class="flex items-center gap-2 text-lg cursor-pointer hover:text-brand transition-colors">
-                    <input type="radio" name="regla" id="rbRegla1" class="w-5 h-5 accent-brand" checked>
+                    <input type="radio" name="regla" id="rbRegla1" class="w-5 h-5 accent-brand">
                     Regla 1 (Registros)
                 </label>
+                --}}
+                <input type="radio" name="regla" id="rbRegla1" class="hidden">
                 <label class="flex items-center gap-2 text-lg cursor-pointer hover:text-brand transition-colors">
-                    <input type="radio" name="regla" id="rbRegla2" class="w-5 h-5 accent-brand">
+                    <input type="radio" name="regla" id="rbRegla2" class="w-5 h-5 accent-brand" checked>
                     Regla 2 (Sellos)
                 </label>
             </div>

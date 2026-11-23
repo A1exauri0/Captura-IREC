@@ -6,9 +6,9 @@
 @section('crud_subtitulo', 'Gestiona los documentos marcados con inconsistencia por los capturistas y da seguimiento a su acción correctiva.')
 
 @section('contenido')
-    <!-- Pestañas por tipo documental con contadores -->
+    <!-- Pestañas por tipo documental (Solo Sellos activo temporalmente) -->
     <div class="d-flex flex-wrap mb-3" style="gap: 8px;">
-        @foreach(['registros' => 'Registros', 'sellos' => 'Sellos', 'notarias' => 'Notarías', 'catastro' => 'Catastro'] as $k => $lbl)
+        @foreach(['sellos' => 'Sellos' /* , 'registros' => 'Registros', 'notarias' => 'Notarías', 'catastro' => 'Catastro' */] as $k => $lbl)
             <a href="{{ route('admin.inconsistencias.index', ['tipo' => $k]) }}"
                class="btn btn-sm {{ $tipo === $k ? 'btn-primary' : 'btn-light border' }}"
                style="{{ $tipo === $k ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">

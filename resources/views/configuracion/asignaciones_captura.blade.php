@@ -24,10 +24,10 @@
                     <div class="form-group">
                         <label class="text-xs font-weight-bold">Tipo de Documento (Define Regla Automática)</label>
                         <select name="tipo_documento" class="form-control" required>
-                            <option value="registros">Registros (Auto-selecciona Regla 1)</option>
-                            <option value="sellos">Sellos y Boletas (Auto-selecciona Regla 2)</option>
-                            <option value="notarias">Notarías (ReglaNotarias)</option>
-                            <option value="catastro">Catastro (ReglaCatastro)</option>
+                            {{-- <option value="registros">Registros (Auto-selecciona Regla 1)</option> --}}
+                            <option value="sellos" selected>Sellos y Boletas (Auto-selecciona Regla 2)</option>
+                            {{-- <option value="notarias">Notarías (ReglaNotarias)</option> --}}
+                            {{-- <option value="catastro">Catastro (ReglaCatastro)</option> --}}
                         </select>
                     </div>
                     <div class="form-group">

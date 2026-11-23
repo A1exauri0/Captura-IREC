@@ -28,7 +28,7 @@ class FlujoStellumController extends Controller
 
     public function inconsistencias(Request $request)
     {
-        $tipo     = $request->query('tipo', 'registros');
+        $tipo     = $request->query('tipo', 'sellos');
         $codigo   = $request->query('codigo');
         $estado   = $request->query('estado');
         $tabla    = $this->mapaTablas[$tipo] ?? 'auditoria_registros';
@@ -106,7 +106,7 @@ class FlujoStellumController extends Controller
 
     public function colisiones(Request $request)
     {
-        $tipo     = $request->query('tipo', 'registros');
+        $tipo     = $request->query('tipo', 'sellos');
         $decision = $request->query('decision', 'pendiente');
         $tabla    = $this->mapaTablas[$tipo] ?? 'auditoria_registros';
 

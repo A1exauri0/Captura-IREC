@@ -44,12 +44,17 @@ class CapturaController extends Controller
         $municipios = Municipios::orderBy('clave')->get(['id', 'nombre', 'clave'])->toArray();
 
         $rutasPorTipo = config('captura_pdf.rutas_por_tipo', []);
+        // Temporalmente solo trabajamos con Sellos (registros, catastro y notarias comentados)
+        $tiposActivos = ['sellos']; // ['registros', 'sellos', 'catastro', 'notarias']
         $directoriosPorDefecto = [];
         foreach ($rutasPorTipo as $tipo => $listaRutas) {
+            if (!in_array($tipo, $tiposActivos, true)) {
+                continue;
+            }
             $reglas = match ($tipo) {
                 'registros' => ['Regla1'],
                 'sellos'    => ['Regla2'],
-                default     => ['Regla1', 'Regla2'],
+                default     => ['Regla2'],
             };
             foreach ($listaRutas as $r) {
                 $directoriosPorDefecto[] = [
@@ -144,7 +149,7 @@ class CapturaController extends Controller
 
         // 0. Intentar primero consultar indice_archivos_pdfs en Stellum (si está disponible)
         $asignacion = AsignacionCapturaUsuario::where('user_id', $userId)->where('activo', true)->first();
-        $tipoDoc = $asignacion?->tipo_documento ?? 'registros';
+        $tipoDoc = 'sellos'; // $asignacion?->tipo_documento ?? 'sellos';
         $delFiltro = $delegacionId ? Delegaciones::find($delegacionId) : null;
 
         try {
@@ -531,9 +536,9 @@ class CapturaController extends Controller
         $usuario = Auth::user();
         $asignacion = AsignacionCapturaUsuario::where('user_id', $usuario?->id)->where('activo', true)->first();
 
-        $tipoDocumento = strtolower((string) ($request->input('tipo_documento') ?: ($asignacion?->tipo_documento ?? 'registros')));
+        $tipoDocumento = strtolower((string) ($request->input('tipo_documento') ?: ($asignacion?->tipo_documento ?? 'sellos')));
         if (!in_array($tipoDocumento, ['registros', 'sellos', 'notarias', 'catastro'])) {
-            $tipoDocumento = 'registros';
+            $tipoDocumento = 'sellos';
         }
 
         $rutaOrigen = (string) ($request->input('ruta_origen') ?: $request->input('ruta_original') ?: $request->input('ruta_archivo') ?: '');

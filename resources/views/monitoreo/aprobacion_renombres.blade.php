@@ -6,9 +6,9 @@
 @section('crud_subtitulo', 'Aprueba los cambios registrados en BD para despacharlos por chunks (500 registros/lote) hacia Stellum (https://app.astronmx.cloud/) y aplicar los renombres físicamente.')
 
 @section('contenido')
-    <!-- Selector de tipo documental -->
+    <!-- Selector de tipo documental (Solo Sellos activo temporalmente) -->
     <div class="d-flex flex-wrap mb-3" style="gap: 8px;">
-        @foreach(['sellos' => 'Sellos', 'registros' => 'Registros', 'notarias' => 'Notarías', 'catastro' => 'Catastro'] as $k => $lbl)
+        @foreach(['sellos' => 'Sellos' /* , 'registros' => 'Registros', 'notarias' => 'Notarías', 'catastro' => 'Catastro' */] as $k => $lbl)
             <a href="{{ route('admin.aprobacion.index', ['tipo' => $k]) }}"
                class="btn btn-sm {{ $tipo === $k ? 'btn-primary' : 'btn-light border' }}"
                style="{{ $tipo === $k ? 'background-color:#034d6d;border-color:#034d6d;' : '' }}">

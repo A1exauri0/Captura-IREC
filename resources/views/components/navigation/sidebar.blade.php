@@ -55,10 +55,10 @@
                 "label": "Indicadores KPI",
                 "icon": "fa-solid fa-chart-pie",
                 "children": [
-                    { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.index" },
-                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.index" },
-                    { "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.capturas" },
-                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.index" }
+                    /* { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.index" }, */
+                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.index" }
+                    /* ,{ "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.capturas" },
+                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.index" } */
                 ]
             },
             {
@@ -66,10 +66,10 @@
                 "label": "Productividad",
                 "icon": "fa-solid fa-users-line",
                 "children": [
-                    { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.usuarios" },
-                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.usuarios" },
-                    { "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.reportes_capturas_notarias" },
-                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.usuarios" }
+                    /* { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.usuarios" }, */
+                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.usuarios" }
+                    /* ,{ "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.reportes_capturas_notarias" },
+                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.usuarios" } */
                 ]
             },
             {
@@ -77,10 +77,10 @@
                 "label": "Bitácoras",
                 "icon": "fa-solid fa-clock-rotate-left",
                 "children": [
-                    { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.detalles_renombre" },
-                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.detalles_renombre" },
-                    { "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.detalles_renombre" },
-                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.detalles_renombre" }
+                    /* { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.detalles_renombre" }, */
+                    { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.detalles_renombre" }
+                    /* ,{ "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.detalles_renombre" },
+                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.detalles_renombre" } */
                 ]
             }
         ]
@@ -131,7 +131,8 @@
 ]
 JSON;
 
-    $menuSections = json_decode($sidebarMenuJson, true) ?: [];
+    $sidebarMenuJsonLimpio = preg_replace('/\/\*.*?\*\//s', '', $sidebarMenuJson);
+    $menuSections = json_decode($sidebarMenuJsonLimpio, true) ?: [];
 @endphp
 
 <aside id="app-sidebar">
