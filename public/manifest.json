@@ -1,0 +1,10 @@
+{
+    "name": "Captura IREC — Estación de Captura y Auditoría PDF",
+    "short_name": "Captura IREC",
+    "start_url": "/captura",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#034d6d",
+    "description": "Sistema de captura, validación y trazabilidad documental IREC",
+    "icons": []
+}

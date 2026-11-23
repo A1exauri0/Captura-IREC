@@ -816,12 +816,10 @@
         });
 
         // Registrar triggers de botones y acciones del flujo
-        document.getElementById('btnRenombrar').addEventListener('click', () => CapturaProcesos.procesarRenombrar(ctx));
-        document.getElementById('btnDuplicar').addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
-        document.getElementById('btnLimpiar').addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
-        btnInconsistencia.addEventListener('click', () => CapturaProcesos.moverInconsistencia(ctx));
-        document.getElementById('btnMover').addEventListener('click', () => CapturaProcesos.moverSellos(ctx));
-        document.getElementById('btnRefrescar').addEventListener('click', () => {
+        document.getElementById('btnRenombrar')?.addEventListener('click', () => CapturaProcesos.procesarRenombrar(ctx));
+        document.getElementById('btnDuplicar')?.addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
+        document.getElementById('btnLimpiar')?.addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
+        document.getElementById('btnRefrescar')?.addEventListener('click', () => {
             const visor = document.getElementById("pdfViewer");
             if (visor && visor.src && visor.src !== "about:blank" && visor.src !== "") {
                 let urlString = visor.src;

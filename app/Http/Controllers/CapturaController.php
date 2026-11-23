@@ -140,7 +140,53 @@ class CapturaController extends Controller
     {
         $disco = $request->query('disco') ?: 'irec';
         $delegacionId = $request->query('delegacion_id');
+        $userId = Auth::id();
 
+        // 0. Intentar primero consultar indice_archivos_pdfs en Stellum (si está disponible)
+        $asignacion = AsignacionCapturaUsuario::where('user_id', $userId)->where('activo', true)->first();
+        $tipoDoc = $asignacion?->tipo_documento ?? 'registros';
+        $delFiltro = $delegacionId ? Delegaciones::find($delegacionId) : null;
+
+        try {
+            $bridge = app(StellumBridgeService::class);
+            $respStellum = $bridge->listarIndice([
+                'tipo'       => $tipoDoc,
+                'delegacion' => $delFiltro?->nombre,
+                'limit'      => 100,
+            ]);
+
+            if (!empty($respStellum['ok']) && !empty($respStellum['items'])) {
+                $listaStellum = array_values(array_map(function ($item) {
+                    return [
+                        'indice_pdf_id' => $item['id'] ?? null,
+                        'ruta'          => 'stellum:' . ($item['id'] ?? 0),
+                        'ruta_origen'   => $item['ruta'] ?? '',
+                        'nombre'        => preg_replace('/\.pdf$/i', '', (string) ($item['nombre'] ?? 'archivo')),
+                        'paginas'       => (int) ($item['paginas'] ?? 1),
+                        'hash'          => $item['hash'] ?? null,
+                    ];
+                }, $respStellum['items']));
+
+                return response()->json([
+                    'ok'            => true,
+                    'fuente'        => 'stellum',
+                    'lote_id'       => 0,
+                    'lote'          => 'Stellum (' . strtoupper($tipoDoc) . ')',
+                    'ruta_relativa' => 'stellum/' . $tipoDoc,
+                    'delegacion'    => $delFiltro ? [
+                        'id'     => $delFiltro->id,
+                        'clave'  => str_pad($delFiltro->clave ?? $delFiltro->id, 2, '0', STR_PAD_LEFT),
+                        'nombre' => $delFiltro->nombre,
+                    ] : null,
+                    'archivos'      => $listaStellum,
+                    'total'         => count($listaStellum),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Fallback automático a lectura directa en los directorios configurados
+        }
+
+        // FALLBACK DIRECTO A DIRECTORIOS DE RED CONFIGURADOS (config/captura_pdf.php)
         $rutaConfigurada = $this->obtenerRutaRaizConfigurada($disco);
         if (!in_array($disco, ['irec', 'cats', 'rciv']) && !$rutaConfigurada) {
             $disco = 'irec';
@@ -149,7 +195,6 @@ class CapturaController extends Controller
         $storage = in_array($disco, ['irec', 'cats', 'rciv'])
             ? Storage::disk($disco)
             : Storage::build(['driver' => 'local', 'root' => $rutaConfigurada]);
-        $userId = Auth::id();
 
         // 1. Reanudar: Verificar si el usuario ya tiene un lote en proceso en este disco
         $queryExistente = LoteCaptura::where('disco', $disco)
@@ -312,7 +357,53 @@ class CapturaController extends Controller
             }
         }
 
-        return response()->json(['ok' => false, 'mensaje' => 'No hay más lotes disponibles para capturar.']);
+        // Fallback final: si es una ruta de entrega directa (sin estructura Respaldo_Original/Lote N),
+        // escanear directamente los PDFs en el directorio configurado (hasta 200 por lote)
+        if ($rutaConfigurada && is_dir($rutaConfigurada)) {
+            $pdfsDirectos = [];
+            try {
+                $iter = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($rutaConfigurada, \FilesystemIterator::SKIP_DOTS),
+                    \RecursiveIteratorIterator::SELF_FIRST
+                );
+                foreach ($iter as $fileInfo) {
+                    if ($fileInfo->isFile() && strtolower($fileInfo->getExtension()) === 'pdf') {
+                        $rutaCompleta = $fileInfo->getPathname();
+                        $relativa = str_replace('\\', '/', ltrim(str_replace($rutaConfigurada, '', $rutaCompleta), '\\/'));
+                        $pdfsDirectos[] = [
+                            'ruta'        => $relativa,
+                            'ruta_origen' => $rutaCompleta,
+                            'nombre'      => pathinfo($rutaCompleta, PATHINFO_FILENAME),
+                        ];
+                        if (count($pdfsDirectos) >= 200) {
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Directorio de red inaccesible desde esta máquina
+            }
+
+            if (!empty($pdfsDirectos)) {
+                $delPrimero = $delegacionesAExaminar[0] ?? null;
+                return response()->json([
+                    'ok'            => true,
+                    'fuente'        => 'directorio_directo',
+                    'lote_id'       => 0,
+                    'lote'          => basename($rutaConfigurada),
+                    'ruta_relativa' => '',
+                    'delegacion'    => $delPrimero ? [
+                        'id'     => $delPrimero->id,
+                        'clave'  => str_pad($delPrimero->clave ?? $delPrimero->id, 2, '0', STR_PAD_LEFT),
+                        'nombre' => $delPrimero->nombre,
+                    ] : null,
+                    'archivos'      => $pdfsDirectos,
+                    'total'         => count($pdfsDirectos),
+                ]);
+            }
+        }
+
+        return response()->json(['ok' => false, 'mensaje' => 'No hay más lotes disponibles para capturar (ni en Stellum ni en los directorios locales/red).']);
     }
 
     /**
@@ -376,7 +467,16 @@ class CapturaController extends Controller
     public function verPdf(Request $request)
     {
         $disco = $request->query('disco');
-        $ruta = $request->query('ruta');
+        $ruta = (string) $request->query('ruta', '');
+
+        // Si el PDF proviene de Stellum (prefijo stellum:{id}), hacer streaming directo desde el puente
+        if (str_starts_with($ruta, 'stellum:')) {
+            $indiceId = (int) substr($ruta, 8);
+            if ($indiceId > 0) {
+                $bridge = app(StellumBridgeService::class);
+                return redirect()->away($bridge->urlStreamPdf($indiceId));
+            }
+        }
 
         $rutaConfigurada = $this->obtenerRutaRaizConfigurada($disco);
         if (!in_array($disco, ['irec', 'cats', 'rciv']) && !$rutaConfigurada) {
