@@ -3,17 +3,12 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\StellMunicipios;
+use App\Models\Municipios;
 use Illuminate\Support\Facades\DB;
 
-class StellMunicipiosSeeder extends Seeder
+class MunicipiosSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-    public function run()
+    public function run(): void
     {
         $municipios = [
             [7, 'ACACOYAGUA', '001'],
@@ -153,17 +148,7 @@ class StellMunicipiosSeeder extends Seeder
             ];
         }
 
-        DB::beginTransaction();
-        try {
-            // Opcional: Limpiar la tabla antes si es necesario
-            // StellMunicipios::truncate();
-            
-            StellMunicipios::insert($data);
-            DB::commit();
-            $this->command->info("¡Seeder de StellMunicipios completado!");
-        } catch (\Exception $e) {
-            DB::rollBack();
-            $this->command->error("Error: " . $e->getMessage());
-        }
+        Municipios::insert($data);
+        $this->command->info("¡Seeder de Municipios completado!");
     }
 }

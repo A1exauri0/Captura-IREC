@@ -24,7 +24,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('stellmunicipios', function (Blueprint $table) {
+        Schema::create('municipios', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('estado')->default(7);
             $table->string('nombre');
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('stelllocalidades', function (Blueprint $table) {
+        Schema::create('localidades', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('municipio')->index();
             $table->string('nombre');
@@ -40,21 +40,33 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('pines_autorizacion', function (Blueprint $table) {
+        Schema::create('peticiones_autorizacion', function (Blueprint $table) {
             $table->id();
-            $table->string('pin', 10);
-            $table->boolean('usado')->default(false);
-            $table->foreignId('usado_por')->nullable()->constrained('users')->nullOnDelete();
-            $table->dateTime('usado_en')->nullable();
+            $table->foreignId('user_id')->nullable()->constrained('users')->onUpdate('cascade')->onDelete('cascade');
+            $table->string('tipo_peticion')->index();
+            $table->string('accion_solicitada')->nullable();
+            $table->string('disco')->nullable();
+            $table->string('lote')->nullable();
+            $table->string('archivo_nombre')->nullable();
+            $table->text('ruta_origen')->nullable();
+            $table->text('ruta_destino')->nullable();
+            $table->integer('paginas')->default(0);
+            $table->string('hash', 64)->nullable()->index();
+            $table->boolean('archivo_danado')->default(false)->index();
+            $table->text('motivo')->nullable();
+            $table->string('estado')->default('pendiente')->index(); // pendiente, autorizada, rechazada
+            $table->foreignId('autorizado_por')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('comentario_resolucion')->nullable();
+            $table->dateTime('resuelto_en')->nullable();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('pines_autorizacion');
-        Schema::dropIfExists('stelllocalidades');
-        Schema::dropIfExists('stellmunicipios');
+        Schema::dropIfExists('peticiones_autorizacion');
+        Schema::dropIfExists('localidades');
+        Schema::dropIfExists('municipios');
         Schema::dropIfExists('delegaciones');
         Schema::dropIfExists('anios');
     }

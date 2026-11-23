@@ -1,5 +1,5 @@
 @php
-    $pinDiario = \App\Models\PinAutorizacion::obtenerPinActivo();
+    $pendientesAuthCount = \App\Models\PeticionAutorizacion::where('estado', 'pendiente')->count();
     $usuarioActual = auth()->user();
 @endphp
 
@@ -21,12 +21,16 @@
             <span class="inline-block w-2 h-2 rounded-full bg-sky-500 mr-1.5"></span>Tiempo Real
         </span>
 
-        <!-- Botón PIN Maestro de Uso Único -->
-        <button type="button" class="btn btn-sm btn-outline-info d-flex align-items-center" data-toggle="modal" data-target="#pinDiarioModal" style="gap: 6px;">
-            <i class="fa-solid fa-key"></i>
-            <span class="d-none d-md-inline">PIN:</span>
-            <strong id="navbarPinBadge">{{ $pinDiario }}</strong>
-        </button>
+        <!-- Botón de Autorizaciones en Tiempo Real -->
+        <a href="{{ route('admin.autorizaciones.index') }}" class="btn btn-sm btn-outline-warning text-dark border d-flex align-items-center" style="gap: 6px; background-color: #fffbeb;">
+            <i class="fa-solid fa-shield-halved text-amber-600"></i>
+            <span class="d-none d-md-inline font-weight-bold text-xs">Autorizaciones</span>
+            <span id="navbarAuthPendientesCount"
+                  class="badge badge-pill badge-danger"
+                  style="{{ $pendientesAuthCount > 0 ? 'display:inline-block;' : 'display:none;' }}">
+                {{ $pendientesAuthCount }}
+            </span>
+        </a>
 
         <!-- Usuario autenticado -->
         @auth
@@ -42,10 +46,10 @@
                 </button>
                 <div class="dropdown-menu dropdown-menu-right shadow-lg border-0 rounded-xl mt-2">
                     <a class="dropdown-item py-2 text-sm" href="{{ route('admin.turnos.index') }}">
-                        <i class="fa-solid fa-user-clock mr-2 text-sky-600"></i> Gestionar Turnos
+                        <i class="fa-solid fa-user-clock mr-2 text-sky-600"></i> Turnos Adaptativos
                     </a>
-                    <a class="dropdown-item py-2 text-sm" href="#" data-toggle="modal" data-target="#pinDiarioModal">
-                        <i class="fa-solid fa-lock mr-2 text-amber-600"></i> PIN de Autorización
+                    <a class="dropdown-item py-2 text-sm" href="{{ route('admin.autorizaciones.index') }}">
+                        <i class="fa-solid fa-shield-halved mr-2 text-amber-600"></i> Autorizaciones en Tiempo Real
                     </a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item py-2 text-sm text-danger font-weight-bold" href="{{ route('logout') }}"
@@ -61,61 +65,29 @@
     </div>
 </header>
 
-<!-- Modal PIN de Autorización de Uso Único -->
-<div class="modal fade" id="pinDiarioModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0" style="border-radius: 14px; overflow: hidden;">
-            <div class="modal-header text-white" style="background: linear-gradient(135deg, #0f172a, #034d6d);">
-                <h5 class="modal-title font-weight-bold">
-                    <i class="fa-solid fa-lock mr-2"></i> PIN de Autorización (Uso Único)
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-            </div>
-            <div class="modal-body text-center p-4 bg-light">
-                <p class="text-muted mb-3 small">
-                    Proporciona este PIN al capturista para autorizar una acción especial en la estación de captura.
-                </p>
-                <div class="p-4 my-2 bg-white rounded-xl shadow-sm border d-inline-block" style="min-width: 200px;">
-                    <h1 id="txtPinActivo" class="display-4 font-weight-bold m-0" style="letter-spacing: 8px; color: #034d6d;">
-                        {{ $pinDiario }}
-                    </h1>
-                </div>
-            </div>
-            <div class="modal-footer bg-white border-top-0 justify-content-center p-3">
-                <button type="button" id="btnGenerarNuevoPin" class="btn btn-outline-primary px-4">
-                    <i class="fa-solid fa-rotate mr-1"></i> Regenerar PIN
-                </button>
-                <button type="button" class="btn btn-secondary px-4" data-dismiss="modal">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const btnRecargar = document.getElementById('btnGenerarNuevoPin');
-        if (btnRecargar) {
-            btnRecargar.addEventListener('click', function () {
-                btnRecargar.disabled = true;
-                fetch("{{ route('admin.usuarios.generarNuevoPin') }}", {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('txtPinActivo').textContent = data.pin;
-                        const badge = document.getElementById('navbarPinBadge');
-                        if (badge) badge.textContent = data.pin;
-                    }
-                })
-                .finally(() => {
-                    btnRecargar.disabled = false;
-                });
-            });
+        if (typeof window.Echo !== 'undefined') {
+            try {
+                window.Echo.channel('autorizaciones-captura')
+                    .listen('.peticion.actualizada', function (e) {
+                        if (e.evento === 'nueva_peticion' && typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                toast: true,
+                                position: 'top-end',
+                                icon: 'info',
+                                title: `Nueva petición de ${e.peticion.capturista} (${e.peticion.tipo_peticion})`,
+                                showConfirmButton: true,
+                                confirmButtonText: 'Ver',
+                                timer: 6000
+                            }).then((r) => {
+                                if (r.isConfirmed) {
+                                    window.location.href = "{{ route('admin.autorizaciones.index') }}";
+                                }
+                            });
+                        }
+                    });
+            } catch (err) {}
         }
     });
 </script>

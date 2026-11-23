@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\User;
 use App\Models\Turno;
 use Illuminate\Support\Facades\DB;
 
@@ -16,7 +15,7 @@ class DatabaseSeeder extends Seeder
             RolesSeeder::class,
             AnioSeeder::class,
             DelegacionesSeeder::class,
-            StellMunicipiosSeeder::class,
+            MunicipiosSeeder::class,
             LocalidadesSeeder::class,
             UsersSeeder::class,
         ]);

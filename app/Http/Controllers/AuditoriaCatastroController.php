@@ -454,7 +454,7 @@ class AuditoriaCatastroController extends Controller
      */
     public function index_capturas()
     {
-        return view('admin.analiticas.capturas.graficaskpi_captura_catastro');
+        return view('indicadores.catastro_avance');
     }
 
     /**
@@ -462,7 +462,7 @@ class AuditoriaCatastroController extends Controller
      */
     public function index_reportes_capturas()
     {
-        return view('admin.analiticas.capturas.graficaskpi_reportes_catastro');
+        return view('productividad.catastro_usuarios');
     }
 
     /**
@@ -476,8 +476,8 @@ class AuditoriaCatastroController extends Controller
         $modoOrigen = $request->modo;
 
         $mapaMunicipios = [];
-        if (Schema::hasTable('stellmunicipios')) {
-            $mapaMunicipios = DB::table('stellmunicipios')->pluck('nombre', 'clave')->toArray();
+        if (Schema::hasTable('municipios')) {
+            $mapaMunicipios = DB::table('municipios')->pluck('nombre', 'clave')->toArray();
         }
 
         $query = DB::table('auditoria_catastro as ac')
@@ -1002,8 +1002,8 @@ class AuditoriaCatastroController extends Controller
         $tipoCatastro = $request->tipo_catastro;
 
         $mapaMunicipios = [];
-        if (Schema::hasTable('stellmunicipios')) {
-            $mapaMunicipios = DB::table('stellmunicipios')->pluck('nombre', 'clave')->toArray();
+        if (Schema::hasTable('municipios')) {
+            $mapaMunicipios = DB::table('municipios')->pluck('nombre', 'clave')->toArray();
         }
 
         $query = DB::table('auditoria_catastro as ac')
@@ -1174,8 +1174,8 @@ class AuditoriaCatastroController extends Controller
         $fin = $request->fin;
 
         $mapaMunicipios = [];
-        if (Schema::hasTable('stellmunicipios')) {
-            $mapaMunicipios = DB::table('stellmunicipios')->pluck('nombre', 'clave')->toArray();
+        if (Schema::hasTable('municipios')) {
+            $mapaMunicipios = DB::table('municipios')->pluck('nombre', 'clave')->toArray();
         }
 
         $query = DB::table('auditoria_catastro')
@@ -1783,7 +1783,7 @@ class AuditoriaCatastroController extends Controller
             }
         ])->sortKeysDesc();
 
-        return view('admin.analiticas.capturas.detalles_renombre_catastro', compact(
+        return view('bitacora.historial_catastro', compact(
             'agrupados', 'registrosArr', 'inicio', 'fin', 'tipoCatastro', 'usuarios', 'userId', 'search', 'registrosPaginados'
         ));
     }

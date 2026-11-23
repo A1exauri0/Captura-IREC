@@ -173,28 +173,42 @@
         </div>
     </div>
 
-    <!-- Modal Pin Maestro -->
+    <!-- Modal Autorización en Tiempo Real (Reemplaza a PIN Maestro) -->
     <div id="modalPinMaestro" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
         <div
-            class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg shadow-xl w-[90%] max-w-[360px] p-5 border border-gray-300 dark:border-gray-700">
+            class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl shadow-2xl w-[90%] max-w-[420px] p-6 border border-gray-300 dark:border-gray-700">
             <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
-                <i class="fa-solid fa-lock text-brand text-2xl"></i>
-                <h3 class="font-bold text-lg">PIN Maestro</h3>
+                <i class="fa-solid fa-shield-halved text-brand text-2xl"></i>
+                <div>
+                    <h3 class="font-bold text-lg leading-tight">Autorización en Tiempo Real</h3>
+                    <span class="text-xs text-gray-500">Supervisión en Vivo (WebSockets)</span>
+                </div>
             </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Ingrese el PIN maestro para autorizar la acción.
-            </p>
+            <div id="panelFormularioPeticion">
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                    Describa brevemente el motivo para enviar la petición de autorización al supervisor en tiempo real:
+                </p>
+                <input type="text" id="txtPinMaestro" placeholder="Motivo (ej. PDF ilegible / Inconsistencia)..." autocomplete="off"
+                    class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand mb-4 text-gray-900 dark:text-white">
+            </div>
+            <div id="panelEsperandoResolucion" class="hidden text-center py-4">
+                <i class="fa-solid fa-satellite-dish fa-beat-fade text-3xl text-amber-500 mb-3 block"></i>
+                <p class="font-bold text-base text-gray-800 dark:text-gray-100" id="lblEstadoPeticionVivo">
+                    Esperando autorización del supervisor...
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    La acción continuará automáticamente apenas sea autorizada.
+                </p>
+            </div>
             <p id="lblPinError" class="text-sm text-red-500 font-semibold mb-4 text-center hidden"></p>
-            <input type="password" id="txtPinMaestro" maxlength="10" placeholder="••••" autocomplete="off"
-                class="w-full px-3 py-2 text-center text-xl font-bold tracking-widest bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand mb-4 text-gray-900 dark:text-white">
             <div class="flex justify-end gap-2">
                 <button id="btnPinCancelar"
                     class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded font-semibold transition-colors">
                     Cancelar
                 </button>
                 <button id="btnPinAceptar"
-                    class="px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded font-semibold transition-colors">
-                    Aceptar
+                    class="px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded font-semibold transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> Solicitar Autorización
                 </button>
             </div>
         </div>
@@ -426,20 +440,99 @@
         const btnComenzar = document.getElementById('btnComenzar');
 
         // ==================================================
-        // LOGICA PIN MAESTRO (DESACTIVADO: ACCESO DIRECTO)
+        // LOGICA DE AUTORIZACIÓN EN TIEMPO REAL (SIN PIN)
         // ==================================================
-        function solicitarPinMaestro() {
-            return Promise.resolve(true);
+        let pinResolve = null;
+        let pollPeticionTimer = null;
+
+        function limpiarTimerPeticion() {
+            if (pollPeticionTimer) {
+                clearInterval(pollPeticionTimer);
+                pollPeticionTimer = null;
+            }
         }
 
-        function procesarPin() {
-            modalPinMaestro.classList.add('hidden');
-            if (pinResolve) pinResolve(true);
+        function solicitarPinMaestro(tipoPeticion = 'Inconsistencia') {
+            return new Promise((resolve) => {
+                pinResolve = resolve;
+                limpiarTimerPeticion();
+                document.getElementById('panelFormularioPeticion').classList.remove('hidden');
+                document.getElementById('panelEsperandoResolucion').classList.add('hidden');
+                document.getElementById('lblPinError').classList.add('hidden');
+                btnPinAceptar.classList.remove('hidden');
+                btnPinAceptar.disabled = false;
+                txtPinMaestro.value = '';
+                modalPinMaestro.classList.remove('hidden');
+                txtPinMaestro.focus();
+            });
+        }
+
+        async function procesarPin() {
+            const pdfActual = (listaPdfs && listaPdfs[indiceActual]) ? listaPdfs[indiceActual] : null;
+            const motivo = txtPinMaestro.value.trim() || 'Inconsistencia detectada en estación de captura';
+
+            btnPinAceptar.disabled = true;
+            document.getElementById('panelFormularioPeticion').classList.add('hidden');
+            document.getElementById('panelEsperandoResolucion').classList.remove('hidden');
+            btnPinAceptar.classList.add('hidden');
+
+            try {
+                const resp = await fetch('/autorizaciones/solicitar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tipo_peticion: 'Inconsistencia',
+                        accion_solicitada: 'Mover archivo a Inconsistencias',
+                        disco: dirSeleccionado ? dirSeleccionado.id : 'irec',
+                        lote: loteActualNombre || 'Lote',
+                        archivo_nombre: pdfActual ? (pdfActual.nombre + '.pdf') : '-',
+                        ruta_origen: pdfActual ? pdfActual.ruta : null,
+                        motivo: motivo
+                    })
+                });
+                const data = await resp.json();
+                if (!data.ok) throw new Error(data.mensaje || 'Error al enviar solicitud');
+
+                const peticionId = data.peticion_id;
+                document.getElementById('lblEstadoPeticionVivo').innerText = `Petición #${peticionId} enviada. Esperando al supervisor...`;
+
+                pollPeticionTimer = setInterval(async () => {
+                    try {
+                        const rEst = await fetch(`/autorizaciones/${peticionId}/estado`);
+                        const dEst = await rEst.json();
+                        if (dEst.estado === 'autorizada') {
+                            limpiarTimerPeticion();
+                            modalPinMaestro.classList.add('hidden');
+                            if (pinResolve) pinResolve(true);
+                        } else if (dEst.estado === 'rechazada') {
+                            limpiarTimerPeticion();
+                            const errEl = document.getElementById('lblPinError');
+                            errEl.innerText = `Solicitud rechazada por ${dEst.supervisor || 'Supervisor'}: ${dEst.comentario_resolucion || ''}`;
+                            errEl.classList.remove('hidden');
+                            setTimeout(() => {
+                                modalPinMaestro.classList.add('hidden');
+                                if (pinResolve) pinResolve(false);
+                            }, 2000);
+                        }
+                    } catch (e) {}
+                }, 2000);
+            } catch (err) {
+                const errEl = document.getElementById('lblPinError');
+                errEl.innerText = err.message;
+                errEl.classList.remove('hidden');
+                btnPinAceptar.disabled = false;
+                btnPinAceptar.classList.remove('hidden');
+            }
         }
 
         function cancelarPin() {
+            limpiarTimerPeticion();
             modalPinMaestro.classList.add('hidden');
-            if (pinResolve) pinResolve(true);
+            if (pinResolve) pinResolve(false);
         }
 
         btnPinAceptar.addEventListener('click', procesarPin);

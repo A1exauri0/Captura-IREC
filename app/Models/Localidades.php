@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class StellLocalidades extends Model
+class Localidades extends Model
 {
-    protected $table = 'stelllocalidades';
+    protected $table = 'localidades';
 
     protected $fillable = [
         'municipio',
@@ -16,6 +16,6 @@ class StellLocalidades extends Model
 
     public function municipioRel()
     {
-        return $this->belongsTo(StellMunicipios::class, 'municipio');
+        return $this->belongsTo(Municipios::class, 'municipio');
     }
 }

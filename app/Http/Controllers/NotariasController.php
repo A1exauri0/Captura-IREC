@@ -10,7 +10,7 @@ use App\Models\Anio;
 use App\Models\Delegaciones;
 use App\Models\LoteCaptura;
 use App\Models\User;
-use App\Models\NotariaSesion;
+use App\Models\LoteCaptura;
 
 class NotariasController extends Controller
 {
@@ -33,7 +33,7 @@ class NotariasController extends Controller
             ];
         })->toArray();
 
-        return view('admin.validacion.captura', compact('anios', 'delegaciones'));
+        return view('operacion.estacion_captura', compact('anios', 'delegaciones'));
     }
 
     // =========================================================
@@ -984,7 +984,7 @@ class NotariasController extends Controller
         // Actualizar updated_at de la sesión activa de notarías del usuario para marcar actividad reciente
         if ($insertados > 0 && isset($userId)) {
             try {
-                \App\Models\NotariaSesion::where('user_id', $userId)
+                \App\Models\LoteCaptura::where('user_id', $userId)
                     ->where('estado', 'en_proceso')
                     ->update(['updated_at' => now()]);
             } catch (\Exception $e) {
@@ -1118,7 +1118,7 @@ class NotariasController extends Controller
         }
 
         if ($liberar) {
-            NotariaSesion::where('user_id', $userId)->where('estado', 'en_proceso')->delete();
+            LoteCaptura::where('user_id', $userId)->where('estado', 'en_proceso')->delete();
             return response()->json([
                 'ok' => true,
                 'mensaje' => 'Sesión liberada correctamente.',
@@ -1135,13 +1135,13 @@ class NotariasController extends Controller
         $resultado = DB::transaction(function () use ($userId, $rutaFinal, $lote, $pc, $directorio) {
             // 1. Liberar automáticamente sesiones inactivas de este volumen (más de 30 minutos sin actualizar)
             if ($rutaFinal) {
-                NotariaSesion::where('ruta_relativa', $rutaFinal)
+                LoteCaptura::where('ruta_relativa', $rutaFinal)
                     ->where('estado', 'en_proceso')
                     ->where('updated_at', '<', now()->subMinutes(30))
                     ->delete();
 
                 // 2. Verificar si OTRO usuario ya tiene este volumen reservado en la misma notaría
-                $ocupante = NotariaSesion::where('ruta_relativa', $rutaFinal)
+                $ocupante = LoteCaptura::where('ruta_relativa', $rutaFinal)
                     ->where('estado', 'en_proceso')
                     ->where('user_id', '!=', $userId)
                     ->lockForUpdate()
@@ -1163,7 +1163,7 @@ class NotariasController extends Controller
             }
 
             // 2. Limpiar sesiones previas del mismo usuario en notarías
-            NotariaSesion::where('user_id', $userId)
+            LoteCaptura::where('user_id', $userId)
                 ->where('estado', 'en_proceso')
                 ->delete();
 
@@ -1175,7 +1175,7 @@ class NotariasController extends Controller
             }
 
             // 3. Crear la nueva sesión inmediatamente
-            $sesion = NotariaSesion::create([
+            $sesion = LoteCaptura::create([
                 'user_id' => $userId,
                 'notaria_nombre' => $notariaNombre,
                 'volumen' => $lote ?? '',
@@ -1203,7 +1203,7 @@ class NotariasController extends Controller
      */
     public function obtenerSesiones(Request $request)
     {
-        $sesiones = NotariaSesion::where('estado', 'en_proceso')
+        $sesiones = LoteCaptura::where('estado', 'en_proceso')
             ->with(['usuario:id,name,user'])
             ->get()
             ->map(function ($sesion) {

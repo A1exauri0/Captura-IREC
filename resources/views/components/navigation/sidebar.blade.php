@@ -30,131 +30,141 @@
             </li>
         </ul>
 
-        <!-- 2. MONITOREO Y BÚSQUEDA EN VIVO -->
+        <!-- 2. MONITOREO Y AUTORIZACIONES EN VIVO -->
         <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Monitoreo & Búsqueda
+            Tiempo Real & Búsqueda
         </div>
         <ul class="list-unstyled mb-4">
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_sellos.reportes.lotes_trabajando') }}"
                    class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.lotes_trabajando') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-satellite-dish w-6 text-center mr-2 text-emerald-400"></i>
-                    <span>Lotes Trabajándose</span>
+                    <span>Sesiones / Lotes Activos</span>
                     <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300" style="font-size: 0.65rem;">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"></span>LIVE
                     </span>
                 </a>
             </li>
             <li class="mb-1">
+                <a href="{{ route('admin.autorizaciones.index') }}"
+                   class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.autorizaciones.*') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+                    <i class="fa-solid fa-shield-halved w-6 text-center mr-2 text-amber-400"></i>
+                    <span>Autorizaciones en Vivo</span>
+                    <span class="ml-auto d-inline-flex align-items-center px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-300" style="font-size: 0.65rem;">
+                        WS
+                    </span>
+                </a>
+            </li>
+            <li class="mb-1">
                 <a href="{{ route('admin.analytics_sellos.reportes.buscar_archivos') }}"
                    class="d-flex align-items-center px-3 py-2.5 rounded-lg text-sm font-medium text-decoration-none transition-colors {{ request()->routeIs('admin.analytics_sellos.reportes.buscar_archivos') ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
-                    <i class="fa-solid fa-magnifying-glass-chart w-6 text-center mr-2 text-amber-400"></i>
-                    <span>Buscador Global PDF</span>
+                    <i class="fa-solid fa-magnifying-glass-chart w-6 text-center mr-2 text-sky-400"></i>
+                    <span>Explorador Global PDF</span>
                 </a>
             </li>
         </ul>
 
-        <!-- 3. GRÁFICAS KPI (AVANCE GENERAL) -->
+        <!-- 3. INDICADORES (AVANCE GENERAL) -->
         <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Gráficas de Avance KPI
+            Indicadores de Avance
         </div>
         <ul class="list-unstyled mb-4">
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_capturas.reportes.index') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_capturas.reportes.index') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-chart-pie w-6 text-center mr-2 text-indigo-400"></i>
-                    <span>Gráficas Registros</span>
+                    <span>Avance Registros</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_sellos.reportes.index') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_sellos.reportes.index') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-chart-column w-6 text-center mr-2 text-emerald-400"></i>
-                    <span>Gráficas Sellos</span>
+                    <span>Avance Sellos</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_digitalizacion.reportes.capturas') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_digitalizacion.reportes.capturas') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-chart-line w-6 text-center mr-2 text-sky-400"></i>
-                    <span>Gráficas Notarías</span>
+                    <span>Avance Notarías</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_catastro.reportes.index') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_catastro.reportes.index') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-chart-area w-6 text-center mr-2 text-amber-400"></i>
-                    <span>Gráficas Catastro</span>
+                    <span>Avance Catastro</span>
                 </a>
             </li>
         </ul>
 
-        <!-- 4. REPORTES POR USUARIO & HISTORIAL -->
+        <!-- 4. PRODUCTIVIDAD POR USUARIO & BITÁCORA -->
         <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Reportes & Historial
+            Productividad & Bitácora
         </div>
         <ul class="list-unstyled mb-4">
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_capturas.reportes.usuarios') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_capturas.reportes.usuarios') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-users-rectangle w-6 text-center mr-2 text-indigo-300"></i>
-                    <span>Reporte Registros</span>
+                    <span>Usuarios Registros</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_sellos.reportes.usuarios') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_sellos.reportes.usuarios') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-user-check w-6 text-center mr-2 text-emerald-300"></i>
-                    <span>Reporte Sellos</span>
+                    <span>Usuarios Sellos</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_digitalizacion.reportes.reportes_capturas_notarias') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_digitalizacion.reportes.reportes_capturas_notarias') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-building-columns w-6 text-center mr-2 text-sky-300"></i>
-                    <span>Reporte Notarías</span>
+                    <span>Usuarios Notarías</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_catastro.reportes.usuarios') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_catastro.reportes.usuarios') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-map-location-dot w-6 text-center mr-2 text-amber-300"></i>
-                    <span>Reporte Catastro</span>
+                    <span>Usuarios Catastro</span>
                 </a>
             </li>
             <li class="mb-1 mt-2 pt-2 border-t border-slate-700/60">
                 <a href="{{ route('admin.analytics_sellos.reportes.detalles_renombre') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_sellos.reportes.detalles_renombre') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-clock-rotate-left w-6 text-center mr-2 text-teal-400"></i>
-                    <span>Renombres Sellos</span>
+                    <span>Bitácora Sellos</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.analytics_catastro.reportes.detalles_renombre') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.analytics_catastro.reportes.detalles_renombre') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-file-pen w-6 text-center mr-2 text-purple-400"></i>
-                    <span>Renombres Catastro</span>
+                    <span>Bitácora Catastro</span>
                 </a>
             </li>
         </ul>
 
         <!-- 5. CONFIGURACIÓN, TURNOS Y CATÁLOGOS -->
         <div class="px-3 mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Administración & CRUDs
+            Configuración & CRUDs
         </div>
         <ul class="list-unstyled mb-2">
             <li class="mb-1">
                 <a href="{{ route('admin.turnos.index') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.turnos.*') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-user-clock w-6 text-center mr-2 text-amber-400"></i>
-                    <span>Turnos Adaptativos</span>
+                    <span>Turnos y Horarios</span>
                 </a>
             </li>
             <li class="mb-1">
                 <a href="{{ route('admin.catalogos.index') }}"
                    class="d-flex align-items-center px-3 py-2 rounded-lg text-sm text-decoration-none {{ request()->routeIs('admin.catalogos.*') ? 'bg-sky-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                     <i class="fa-solid fa-map-pin w-6 text-center mr-2 text-rose-400"></i>
-                    <span>Delegaciones, Mun. y Rutas PDF</span>
+                    <span>Catálogos y Rutas PDF</span>
                 </a>
             </li>
         </ul>

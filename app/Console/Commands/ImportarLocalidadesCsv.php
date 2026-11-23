@@ -3,14 +3,14 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\StellLocalidades;
+use App\Models\Localidades;
 use Illuminate\Support\Facades\DB;
 
 class ImportarLocalidadesCsv extends Command
 {
     protected $signature = 'importar:localidades-csv';
 
-    protected $description = 'Lee el archivo localidades.csv y lo inserta en la tabla stelllocalidades';
+    protected $description = 'Lee el archivo localidades.csv y lo inserta en la tabla localidades';
 
     public function handle()
     {
@@ -30,7 +30,7 @@ class ImportarLocalidadesCsv extends Command
         $tamanoLote = 1000;
         $totalProcesados = 0;
 
-        DB::table('stelllocalidades')->truncate();
+        DB::table('localidades')->truncate();
 
         while (($fila = fgetcsv($file)) !== false) {
             if (empty($fila) || count($fila) < 3) {
@@ -46,14 +46,14 @@ class ImportarLocalidadesCsv extends Command
             ];
 
             if (count($lote) >= $tamanoLote) {
-                StellLocalidades::insert($lote);
+                Localidades::insert($lote);
                 $totalProcesados += count($lote);
                 $lote = [];
             }
         }
 
         if (!empty($lote)) {
-            StellLocalidades::insert($lote);
+            Localidades::insert($lote);
             $totalProcesados += count($lote);
         }
 

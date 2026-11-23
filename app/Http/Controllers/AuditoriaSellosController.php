@@ -457,7 +457,7 @@ class AuditoriaSellosController extends Controller
      */
     public function index_capturas()
     {
-        return view('admin.analiticas.capturas.graficaskpi_captura_sellos');
+        return view('indicadores.sellos_avance');
     }
 
     /**
@@ -465,7 +465,7 @@ class AuditoriaSellosController extends Controller
      */
     public function index_reportes_capturas()
     {
-        return view('admin.analiticas.capturas.graficaskpi_reportes_sellos');
+        return view('productividad.sellos_usuarios');
     }
 
     /**
@@ -2166,7 +2166,7 @@ class AuditoriaSellosController extends Controller
             }
         ])->sortKeysDesc();
 
-        return view('admin.analiticas.capturas.detalles_renombre_sellos', compact('agrupados', 'registrosArr', 'inicio', 'fin', 'tipoSello', 'usuarios', 'userId', 'search', 'registrosPaginados', 'verAdmin'));
+        return view('bitacora.historial_sellos', compact('agrupados', 'registrosArr', 'inicio', 'fin', 'tipoSello', 'usuarios', 'userId', 'search', 'registrosPaginados', 'verAdmin'));
     }
 
     public function ver_pdf($id)
@@ -4570,7 +4570,7 @@ class AuditoriaSellosController extends Controller
     {
         $delegaciones = DB::table('delegaciones')->select('id', 'nombre')->orderBy('nombre')->get();
         $usuarios = DB::table('users')->select('id', 'name')->orderBy('name')->get();
-        return view('admin.analiticas.capturas.buscar_archivos', compact('delegaciones', 'usuarios'));
+        return view('buscador.explorador_global', compact('delegaciones', 'usuarios'));
     }
 
     /**
@@ -4682,17 +4682,17 @@ class AuditoriaSellosController extends Controller
     }
 
     /**
-     * Muestra la vista de lotes que se están trabajando (LoteCaptura y NotariasSesion)
+     * Muestra la vista de lotes que se están trabajando (unificados en LoteCaptura)
      */
     public function index_lotes_trabajando()
     {
         $delegaciones = DB::table('delegaciones')->select('id', 'nombre')->orderBy('nombre')->get();
         $usuarios = DB::table('users')->select('id', 'name')->orderBy('name')->get();
-        return view('admin.analiticas.capturas.lotes_trabajando', compact('delegaciones', 'usuarios'));
+        return view('monitoreo.sesiones_activas', compact('delegaciones', 'usuarios'));
     }
 
     /**
-     * Obtiene la lista de lotes en la tabla lotes_captura y notarias_sesiones
+     * Obtiene la lista de lotes unificados en la tabla lotes_captura (Registros, Sellos, Catastro y Notarías)
      */
     public function obtener_lotes_trabajando(Request $request)
     {
@@ -4701,119 +4701,64 @@ class AuditoriaSellosController extends Controller
         $user_id = $request->user_id;
         $origen = $request->origen; // 'captura', 'catastro', 'notaria', '' (todos)
 
-        $lotesCapturaColeccion = collect();
-        $notariasColeccion = collect();
+        $queryCaptura = \App\Models\LoteCaptura::with(['usuario', 'delegacion']);
 
-        // 1. Consultar lotes_captura (Registros, Sellos, Catastro)
-        if (empty($origen) || $origen === 'captura' || $origen === 'catastro') {
-            $queryCaptura = \App\Models\LoteCaptura::with(['usuario', 'delegacion']);
-
-            if (!empty($estado)) {
-                $queryCaptura->where('estado', $estado);
-            }
-
-            if (!empty($delegacion_id)) {
-                $queryCaptura->where('delegacion_id', $delegacion_id);
-            }
-
-            if (!empty($user_id)) {
-                $queryCaptura->where('user_id', $user_id);
-            }
-
-            $lotesCaptura = $queryCaptura->get();
-
-            $lotesCapturaColeccion = $lotesCaptura->map(function ($lote) use ($origen) {
-                $esCatastro = (strtolower((string) $lote->disco) === 'ssdcats' || (int) $lote->delegacion_id === 500 || str_contains(strtoupper((string) $lote->ruta_relativa), 'CATASTRO'));
-
-                if ($origen === 'catastro' && !$esCatastro) {
-                    return null;
-                }
-                if ($origen === 'captura' && $esCatastro) {
-                    return null;
-                }
-
-                $nombreDelegacion = $lote->delegacion ? $lote->delegacion->nombre : 'Sin Delegación';
-                if ($esCatastro && ($nombreDelegacion === 'Sin Delegación' || $nombreDelegacion === 'TUXTLA GUTIÉRREZ' || empty($nombreDelegacion))) {
-                    $nombreDelegacion = 'CATASTRO';
-                }
-
-                return [
-                    'id' => $lote->id,
-                    'tipo_origen' => 'captura',
-                    'disco' => $lote->disco ?: 'N/A',
-                    'es_catastro' => $esCatastro,
-                    'es_notaria' => false,
-                    'nombre_lote' => $lote->nombre_lote,
-                    'ruta_relativa' => $lote->ruta_relativa,
-                    'estado' => $lote->estado,
-                    'delegacion' => $nombreDelegacion,
-                    'delegacion_id' => $lote->delegacion_id,
-                    'usuario' => $lote->usuario ? ($lote->usuario->name ?: $lote->usuario->nombre) : 'Sin Usuario (ID: ' . $lote->user_id . ')',
-                    'user_id' => $lote->user_id,
-                    'tomado_en' => $lote->tomado_en ? $lote->tomado_en->format('Y-m-d H:i:s') : ($lote->created_at ? $lote->created_at->format('Y-m-d H:i:s') : '-'),
-                    'completado_en' => $lote->completado_en ? $lote->completado_en->format('Y-m-d H:i:s') : '-',
-                    'progreso_archivo' => $lote->progreso_archivo ?: '-',
-                    'updated_at' => $lote->updated_at ? $lote->updated_at->format('Y-m-d H:i:s') : '-',
-                    'raw_time' => $lote->updated_at ? $lote->updated_at->timestamp : ($lote->tomado_en ? $lote->tomado_en->timestamp : ($lote->created_at ? $lote->created_at->timestamp : 0)),
-                ];
-            })->filter();
+        if (!empty($estado)) {
+            $queryCaptura->where('estado', $estado);
         }
 
-        // 2. Consultar notarias_sesiones (Notarías)
-        if (empty($origen) || $origen === 'notaria') {
-            $queryNotarias = \App\Models\NotariaSesion::with(['usuario']);
-
-            if (!empty($estado)) {
-                $queryNotarias->where('estado', $estado);
-            }
-
-            if (!empty($user_id)) {
-                $queryNotarias->where('user_id', $user_id);
-            }
-
-            // Si se filtra por delegación específica, checar si el nombre coincide con la notaría
-            if (!empty($delegacion_id)) {
-                $delObj = DB::table('delegaciones')->where('id', $delegacion_id)->first();
-                if ($delObj) {
-                    $queryNotarias->whereRaw('LOWER(notaria_nombre) LIKE ?', ['%' . strtolower($delObj->nombre) . '%']);
-                }
-            }
-
-            $notarias = $queryNotarias->get();
-
-            $notariasColeccion = $notarias->map(function ($notaria) {
-                $nombreNotaria = $notaria->notaria_nombre ?: 'Notaría';
-                $nombreVolumen = $notaria->volumen ?: ($notaria->ruta_relativa ? basename($notaria->ruta_relativa) : 'Volumen Sin Nombre');
-
-                $progreso = $notaria->pc ? 'PC: ' . $notaria->pc : '-';
-                if ($notaria->ruta_relativa && $progreso === '-') {
-                    $progreso = $notaria->ruta_relativa;
-                }
-
-                return [
-                    'id' => $notaria->id,
-                    'tipo_origen' => 'notaria',
-                    'disco' => $notaria->disco ?: 'N/A',
-                    'es_catastro' => false,
-                    'es_notaria' => true,
-                    'nombre_lote' => $nombreVolumen,
-                    'ruta_relativa' => $notaria->ruta_relativa,
-                    'estado' => $notaria->estado ?: 'en_proceso',
-                    'delegacion' => $nombreNotaria,
-                    'delegacion_id' => null,
-                    'usuario' => $notaria->usuario ? ($notaria->usuario->name ?: $notaria->usuario->user) : 'Sin Usuario (ID: ' . $notaria->user_id . ')',
-                    'user_id' => $notaria->user_id,
-                    'tomado_en' => $notaria->tomado_en ? $notaria->tomado_en->format('Y-m-d H:i:s') : ($notaria->created_at ? $notaria->created_at->format('Y-m-d H:i:s') : '-'),
-                    'completado_en' => $notaria->completado_en ? $notaria->completado_en->format('Y-m-d H:i:s') : '-',
-                    'progreso_archivo' => $progreso,
-                    'updated_at' => $notaria->updated_at ? $notaria->updated_at->format('Y-m-d H:i:s') : '-',
-                    'raw_time' => $notaria->updated_at ? $notaria->updated_at->timestamp : ($notaria->tomado_en ? $notaria->tomado_en->timestamp : ($notaria->created_at ? $notaria->created_at->timestamp : 0)),
-                ];
-            });
+        if (!empty($delegacion_id)) {
+            $queryCaptura->where('delegacion_id', $delegacion_id);
         }
 
-        // 3. Unir y ordenar de forma descendente por última actividad
-        $todosLotes = $lotesCapturaColeccion->concat($notariasColeccion)->sortByDesc('raw_time')->values();
+        if (!empty($user_id)) {
+            $queryCaptura->where('user_id', $user_id);
+        }
+
+        $lotesCaptura = $queryCaptura->get();
+
+        $todosLotes = $lotesCaptura->map(function ($lote) use ($origen) {
+            $esNotaria = ($lote->tipo_archivo === 'notarias' || !empty($lote->notaria_nombre) || strtoupper((string) $lote->disco) === 'NOTARÍAS');
+            $esCatastro = !$esNotaria && ($lote->tipo_archivo === 'catastro' || strtolower((string) $lote->disco) === 'ssdcats' || (int) $lote->delegacion_id === 500 || str_contains(strtoupper((string) $lote->ruta_relativa), 'CATASTRO'));
+
+            if ($origen === 'notaria' && !$esNotaria) {
+                return null;
+            }
+            if ($origen === 'catastro' && !$esCatastro) {
+                return null;
+            }
+            if ($origen === 'captura' && ($esCatastro || $esNotaria)) {
+                return null;
+            }
+
+            $nombreDelegacion = $esNotaria
+                ? ($lote->notaria_nombre ?: 'Notaría')
+                : ($lote->delegacion ? $lote->delegacion->nombre : 'Sin Delegación');
+
+            if ($esCatastro && ($nombreDelegacion === 'Sin Delegación' || $nombreDelegacion === 'TUXTLA GUTIÉRREZ' || empty($nombreDelegacion))) {
+                $nombreDelegacion = 'CATASTRO';
+            }
+
+            return [
+                'id' => $lote->id,
+                'tipo_origen' => $esNotaria ? 'notaria' : ($esCatastro ? 'catastro' : 'captura'),
+                'disco' => $lote->disco ?: 'N/A',
+                'es_catastro' => $esCatastro,
+                'es_notaria' => $esNotaria,
+                'nombre_lote' => $esNotaria ? ($lote->volumen ?: $lote->nombre_lote) : $lote->nombre_lote,
+                'ruta_relativa' => $lote->ruta_relativa,
+                'estado' => $lote->estado,
+                'delegacion' => $nombreDelegacion,
+                'delegacion_id' => $lote->delegacion_id,
+                'usuario' => $lote->usuario ? ($lote->usuario->name ?: $lote->usuario->user) : 'Sin Usuario (ID: ' . $lote->user_id . ')',
+                'user_id' => $lote->user_id,
+                'tomado_en' => $lote->tomado_en ? $lote->tomado_en->format('Y-m-d H:i:s') : ($lote->created_at ? $lote->created_at->format('Y-m-d H:i:s') : '-'),
+                'completado_en' => $lote->completado_en ? $lote->completado_en->format('Y-m-d H:i:s') : '-',
+                'progreso_archivo' => $lote->progreso_archivo ?: ($lote->pc ? 'PC: ' . $lote->pc : '-'),
+                'updated_at' => $lote->updated_at ? $lote->updated_at->format('Y-m-d H:i:s') : '-',
+                'raw_time' => $lote->updated_at ? $lote->updated_at->timestamp : ($lote->tomado_en ? $lote->tomado_en->timestamp : ($lote->created_at ? $lote->created_at->timestamp : 0)),
+            ];
+        })->filter()->sortByDesc('raw_time')->values();
 
         $totalLotes = $todosLotes->count();
         $enProceso = $todosLotes->where('estado', 'en_proceso')->count();
@@ -4832,38 +4777,29 @@ class AuditoriaSellosController extends Controller
     }
 
     /**
-     * Elimina un registro de lote en lotes_captura o notarias_sesiones para liberarlo
+     * Elimina un registro de lote en lotes_captura para liberarlo
      */
     public function eliminar_lote_trabajando(Request $request)
     {
         $id = $request->id;
-        $tipo = $request->tipo; // 'notaria' o 'captura'
-
-        if ($tipo === 'notaria') {
-            $lote = \App\Models\NotariaSesion::find($id);
-            $nombreLote = $lote ? ($lote->volumen ?: $lote->notaria_nombre) : null;
-        } else {
-            $lote = \App\Models\LoteCaptura::find($id);
-            if (!$lote) {
-                // Fallback a notarias
-                $lote = \App\Models\NotariaSesion::find($id);
-                $nombreLote = $lote ? ($lote->volumen ?: $lote->notaria_nombre) : null;
-            } else {
-                $nombreLote = $lote->nombre_lote;
-            }
-        }
+        $lote = \App\Models\LoteCaptura::find($id);
 
         if (!$lote) {
-            self::logSellos('warning', 'Intento de eliminar lote trabajando no encontrado', ['id' => $id, 'tipo' => $tipo]);
+            self::logSellos('warning', 'Intento de eliminar lote trabajando no encontrado', ['id' => $id]);
             return response()->json([
                 'exito' => false,
-                'mensaje' => 'El registro del lote o sesión de notaría no fue encontrado o ya había sido eliminado.'
+                'mensaje' => 'El registro de la sesión/lote no fue encontrado o ya había sido eliminado.'
             ], 404);
         }
 
+        $nombreLote = $lote->volumen ?: $lote->nombre_lote;
         $lote->delete();
 
-        self::logSellos('info', 'Lote/sesión trabajando eliminado', ['id' => $id, 'tipo' => $tipo, 'nombre_lote' => $nombreLote]);
+        try {
+            broadcast(new \App\Events\LoteActualizadoEvent('lote_eliminado', ['id' => $id, 'lote' => $nombreLote]));
+        } catch (\Throwable $e) {}
+
+        self::logSellos('info', 'Lote/sesión trabajando eliminado', ['id' => $id, 'nombre_lote' => $nombreLote]);
 
         return response()->json([
             'exito' => true,

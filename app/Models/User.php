@@ -18,7 +18,6 @@ class User extends Authenticatable
         'password',
         'turno_id',
         'turno',
-        'pin',
         'estatus',
     ];
 
@@ -39,5 +38,10 @@ class User extends Authenticatable
     public function turnoRelacion()
     {
         return $this->belongsTo(Turno::class, 'turno_id');
+    }
+
+    public function peticionesAutorizacion()
+    {
+        return $this->hasMany(PeticionAutorizacion::class, 'user_id');
     }
 }

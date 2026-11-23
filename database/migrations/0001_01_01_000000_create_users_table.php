@@ -29,7 +29,6 @@ return new class extends Migration
             $table->string('password');
             $table->foreignId('turno_id')->nullable()->constrained('turnos')->onUpdate('cascade')->onDelete('set null');
             $table->string('turno')->nullable()->default('Matutino');
-            $table->string('pin', 10)->nullable();
             $table->boolean('estatus')->default(true);
             $table->rememberToken();
             $table->timestamps();

@@ -10,9 +10,8 @@ use App\Models\Anio;
 use App\Models\Delegaciones;
 use App\Models\LoteCaptura;
 use App\Models\User;
-use App\Models\NotariaSesion;
-use App\Models\StellMunicipios;
-use App\Models\StellLocalidades;
+use App\Models\Municipios;
+use App\Models\Localidades;
 use App\Services\PdfService;
 use App\Events\LoteActualizadoEvent;
 
@@ -37,7 +36,7 @@ class CapturaController extends Controller
             ];
         })->toArray();
 
-        $municipios = StellMunicipios::orderBy('clave')->get(['id', 'nombre', 'clave'])->toArray();
+        $municipios = Municipios::orderBy('clave')->get(['id', 'nombre', 'clave'])->toArray();
 
         $rutasPorTipo = config('captura_pdf.rutas_por_tipo', []);
         $directoriosPorDefecto = [];
@@ -59,7 +58,7 @@ class CapturaController extends Controller
             }
         }
 
-        return view('admin.validacion.captura', compact('anios', 'delegaciones', 'municipios', 'directoriosPorDefecto'));
+        return view('operacion.estacion_captura', compact('anios', 'delegaciones', 'municipios', 'directoriosPorDefecto'));
     }
 
     /**
@@ -70,7 +69,7 @@ class CapturaController extends Controller
         $municipioId = $request->query('municipio_id');
         $busqueda = trim((string) $request->query('q', ''));
 
-        $query = StellLocalidades::query();
+        $query = Localidades::query();
         if ($municipioId) {
             $query->where('municipio', $municipioId);
         }
@@ -1338,49 +1337,31 @@ class CapturaController extends Controller
     }
 
     /**
-     * Obtiene la lista de usuarios con sesiones activas (en_proceso) para actas y notarías.
+     * Obtiene la lista de usuarios con sesiones activas (en_proceso) unificadas en LoteCaptura.
      */
     public function obtenerSesiones(Request $request)
     {
-        $sesionesLotes = LoteCaptura::where('estado', 'en_proceso')
+        $sesionesUnificadas = LoteCaptura::where('estado', 'en_proceso')
             ->with(['usuario:id,name,user', 'delegacion:id,nombre,clave'])
             ->get()
             ->map(function ($lote) {
+                $esNotaria = ($lote->tipo_archivo === 'notarias' || !empty($lote->notaria_nombre));
+                $notariaId = $esNotaria ? preg_replace('/[^0-9]/', '', $lote->notaria_nombre ?? '') : null;
+
                 return [
                     'id' => $lote->id,
                     'user_id' => $lote->user_id,
                     'usuario' => $lote->usuario ? $lote->usuario->name : null,
                     'nombre_usuario' => $lote->usuario ? $lote->usuario->user : null,
-                    'delegacion_id' => $lote->delegacion_id,
-                    'delegacion' => $lote->delegacion ? $lote->delegacion->nombre : null,
+                    'delegacion_id' => $esNotaria ? (!empty($notariaId) ? (int) $notariaId : null) : $lote->delegacion_id,
+                    'delegacion' => $esNotaria ? $lote->notaria_nombre : ($lote->delegacion ? $lote->delegacion->nombre : null),
                     'directorio' => $lote->disco,
-                    'lote' => $lote->nombre_lote,
-                    'pc' => $lote->ruta_relativa,
+                    'lote' => $esNotaria ? ($lote->volumen ?: $lote->nombre_lote) : $lote->nombre_lote,
+                    'pc' => $lote->pc ?: $lote->ruta_relativa,
                     'tomado_en' => $lote->tomado_en ? $lote->tomado_en->toDateTimeString() : null,
                     'progreso_archivo' => $lote->progreso_archivo,
                 ];
             });
-
-        $sesionesNotarias = NotariaSesion::where('estado', 'en_proceso')
-            ->with(['usuario:id,name,user'])
-            ->get()
-            ->map(function ($sesion) {
-                $notariaId = preg_replace('/[^0-9]/', '', $sesion->notaria_nombre ?? '');
-                return [
-                    'id' => $sesion->id,
-                    'user_id' => $sesion->user_id,
-                    'usuario' => $sesion->usuario ? $sesion->usuario->name : null,
-                    'nombre_usuario' => $sesion->usuario ? $sesion->usuario->user : null,
-                    'delegacion_id' => !empty($notariaId) ? (int) $notariaId : null,
-                    'delegacion' => $sesion->notaria_nombre,
-                    'directorio' => $sesion->disco ?? 'NOTARÍAS',
-                    'lote' => $sesion->volumen,
-                    'pc' => $sesion->ruta_relativa,
-                    'tomado_en' => $sesion->tomado_en ? $sesion->tomado_en->toDateTimeString() : null,
-                ];
-            });
-
-        $sesionesUnificadas = $sesionesLotes->concat($sesionesNotarias);
 
         return response()->json([
             'ok' => true,

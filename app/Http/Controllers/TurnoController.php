@@ -14,7 +14,7 @@ class TurnoController extends Controller
         $turnos = Turno::withCount('usuarios')->orderBy('id')->get();
         $usuarios = User::with('turnoRelacion')->orderBy('name')->get();
 
-        return view('admin.turnos.index', compact('turnos', 'usuarios'));
+        return view('configuracion.turnos_horarios', compact('turnos', 'usuarios'));
     }
 
     public function store(Request $request)

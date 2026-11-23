@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Auditoria Registros (anteriormente auditoria_capturas)
+        // 1. Auditoria Registros
         Schema::create('auditoria_registros', function (Blueprint $table) {
             $table->id();
             $table->dateTime('fecha_hora')->index();
@@ -110,12 +110,15 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 5. Lotes Captura (Monitoreo en tiempo real)
+        // 5. Lotes Captura (Sesión única unificada para Registros, Sellos, Catastro y Notarías)
         Schema::create('lotes_captura', function (Blueprint $table) {
             $table->id();
             $table->string('disco')->default('irec');
-            $table->string('tipo_archivo')->default('registros')->index();
+            $table->string('tipo_archivo')->default('registros')->index(); // registros, sellos, catastro, notarias
             $table->foreignId('delegacion_id')->nullable()->constrained('delegaciones')->onUpdate('cascade')->onDelete('set null');
+            $table->string('notaria_nombre')->nullable();
+            $table->string('volumen')->nullable();
+            $table->string('pc')->nullable();
             $table->string('nombre_lote');
             $table->string('ruta_relativa');
             $table->text('ruta_origen')->nullable();
@@ -130,31 +133,10 @@ return new class extends Migration
             $table->string('progreso_archivo')->nullable();
             $table->timestamps();
         });
-
-        // 6. Notarias Sesiones (Monitoreo en tiempo real de Notarias)
-        Schema::create('notarias_sesiones', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->nullable()->constrained('users')->onUpdate('cascade')->onDelete('set null');
-            $table->string('notaria_nombre')->nullable();
-            $table->string('volumen')->nullable();
-            $table->string('ruta_relativa')->nullable();
-            $table->text('ruta_origen')->nullable();
-            $table->text('ruta_destino')->nullable();
-            $table->integer('paginas')->default(0);
-            $table->string('hash', 64)->nullable()->index();
-            $table->boolean('archivo_danado')->default(false)->index();
-            $table->string('disco')->nullable();
-            $table->string('pc')->nullable();
-            $table->string('estado')->default('en_proceso')->index();
-            $table->dateTime('tomado_en')->nullable();
-            $table->dateTime('completado_en')->nullable();
-            $table->timestamps();
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('notarias_sesiones');
         Schema::dropIfExists('lotes_captura');
         Schema::dropIfExists('auditoria_catastro');
         Schema::dropIfExists('auditoria_notarias');

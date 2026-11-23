@@ -89,17 +89,17 @@ class ReportesCapturasController extends Controller
             ->orderBy('nombre', 'asc')
             ->get();
 
-        return view('admin.analiticas.capturas.graficaskpi_captura_registros', compact('delegaciones'));
+        return view('indicadores.registros_avance', compact('delegaciones'));
     }
 
     public function index_reportes_capturas()
     {
-        return view('admin.analiticas.capturas.graficaskpi_reportes_registros');
+        return view('productividad.registros_usuarios');
     }
 
     public function index_reportes_capturas_notarias()
     {
-        return view('admin.analiticas.capturas.graficaskpi_reportes_notarias');
+        return view('productividad.notarias_usuarios');
     }
 
 
@@ -1278,7 +1278,7 @@ class ReportesCapturasController extends Controller
 
     public function index_capturas_notarias()
     {
-        return view('admin.analiticas.capturas.graficaskpi_captura_notarias');
+        return view('indicadores.notarias_avance');
     }
 
     public function dashboard_capturas_notarias(Request $request)

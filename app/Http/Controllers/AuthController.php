@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Models\PinAutorizacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -50,14 +49,5 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         return redirect()->route('login');
-    }
-
-    public function generarNuevoPin()
-    {
-        $pin = PinAutorizacion::regenerarPin();
-        return response()->json([
-            'success' => true,
-            'pin'     => $pin,
-        ]);
     }
 }
