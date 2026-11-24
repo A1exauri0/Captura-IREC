@@ -134,6 +134,12 @@ JSON;
 
     $sidebarMenuJsonLimpio = preg_replace('/\/\*.*?\*\//s', '', $sidebarMenuJson);
     $menuSections = json_decode($sidebarMenuJsonLimpio, true) ?: [];
+
+    // Si el usuario tiene rol exclusivo de Captura, solo mostrar la sección Operación (Estación de Captura)
+    $usrSidebar = auth()->user();
+    if ($usrSidebar && $usrSidebar->hasRole('Captura') && !$usrSidebar->hasAnyRole(['superadmin', 'administrador'])) {
+        $menuSections = array_values(array_filter($menuSections, fn ($s) => ($s['section'] ?? '') === 'Operación'));
+    }
 @endphp
 
 <aside id="app-sidebar">

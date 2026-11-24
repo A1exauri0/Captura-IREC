@@ -59,8 +59,9 @@ Route::middleware(['auth'])->group(function () {
 
     // =========================================================================
     // SECCIÓN 2: RUTAS PARA ADMINISTRACIÓN Y SUPERVISIÓN (/admin)
+    // Protegidas: los capturistas NO pueden acceder a ninguna ruta ni endpoint aquí
     // =========================================================================
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware(['restringir.capturista'])->group(function () {
 
         // Centro de autorizaciones en tiempo real (WebSockets)
         Route::name('admin.autorizaciones.')->prefix('autorizaciones')->group(function () {

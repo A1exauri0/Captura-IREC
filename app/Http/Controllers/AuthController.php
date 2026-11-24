@@ -12,6 +12,10 @@ class AuthController extends Controller
     public function showLoginForm()
     {
         if (Auth::check()) {
+            $user = Auth::user();
+            if ($user->hasRole('Captura') && !$user->hasAnyRole(['superadmin', 'administrador'])) {
+                return redirect()->route('admin.captura.index');
+            }
             return redirect()->route('admin.analytics_sellos.reportes.lotes_trabajando');
         }
         return view('auth.login');
@@ -35,6 +39,12 @@ class AuthController extends Controller
         if ($user && Hash::check($password, $user->password)) {
             Auth::login($user, true);
             $request->session()->regenerate();
+
+            // Los capturistas siempre van directo a la Estación de Captura (sin intended a /admin/*)
+            if ($user->hasRole('Captura') && !$user->hasAnyRole(['superadmin', 'administrador'])) {
+                return redirect()->route('admin.captura.index');
+            }
+
             return redirect()->intended(route('admin.analytics_sellos.reportes.lotes_trabajando'));
         }
 
