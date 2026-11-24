@@ -10,12 +10,11 @@
 </head>
 <body class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-        <div class="bg-gradient-to-r from-slate-900 to-sky-900 p-6 text-center text-white">
+        <div class="bg-linear-to-r from-slate-900 to-sky-900 p-6 text-center text-white">
             <div class="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto mb-3 shadow">
                 <img src="{{ asset('img/favicon.png') }}" alt="Captura IREC" class="w-full h-full object-contain">
             </div>
             <h1 class="text-2xl font-bold tracking-tight">Digitalización Chiapas 2026</h1>
-            <p class="text-xs text-sky-200 mt-1">Sistema de Captura, Validación y Trazabilidad Documental</p>
         </div>
 
         <form method="POST" action="{{ route('login.submit') }}" class="p-6 space-y-4">
@@ -30,9 +29,9 @@
                 <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Usuario o Correo Electrónico</label>
                 <div class="relative">
                     <i class="fa-solid fa-user absolute left-3.5 top-3 text-slate-400"></i>
-                    <input type="text" name="login" value="{{ old('login', 'Administrador') }}" required autofocus
+                    <input type="text" name="login" value="{{ old('login') }}" required autofocus
                            class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 text-sm"
-                           placeholder="Ej. Administrador o admin@gmail.com">
+                           placeholder="usuario@gmail.com">
                 </div>
             </div>
 

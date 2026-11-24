@@ -12,8 +12,8 @@ class StellumBridgeService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) env('STELLUM_BRIDGE_URL', 'https://app.astronmx.cloud/api/captura-bridge'), '/');
-        $this->token   = (string) env('STELLUM_BRIDGE_TOKEN', '');
+        $this->baseUrl = rtrim((string) config('services.stellum_bridge.url', 'https://app.astronmx.cloud/api/captura-bridge'), '/');
+        $this->token   = (string) config('services.stellum_bridge.token', 'irec_stellum_bridge_2026_secret');
     }
 
     /**
@@ -133,7 +133,9 @@ class StellumBridgeService
         try {
             $response = Http::withToken($this->token)
                 ->timeout(15)
-                ->get($this->baseUrl . '/equipos/entregados');
+                ->get($this->baseUrl . '/equipos/entregados', [
+                    'bridge_token' => $this->token,
+                ]);
 
             if ($response->successful()) {
                 return $response->json() ?: ['ok' => false, 'equipos' => []];
@@ -155,10 +157,8 @@ class StellumBridgeService
     public function proxyEquipos(string $method, array $query = [], array $body = []): array
     {
         try {
-            $url = $this->baseUrl . '/equipos/api';
-            if (!empty($query)) {
-                $url .= '?' . http_build_query($query);
-            }
+            $query['bridge_token'] = $this->token;
+            $url = $this->baseUrl . '/equipos/api?' . http_build_query($query);
 
             $http = Http::withToken($this->token)->timeout(25);
             $response = strtoupper($method) === 'POST'
