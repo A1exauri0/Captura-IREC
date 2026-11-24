@@ -130,6 +130,14 @@ class StellumBridgeService
      */
     public function obtenerEquiposEntregados(): array
     {
+        if ($this->baseUrl === '' || !preg_match('#^https?://#i', $this->baseUrl)) {
+            return [
+                'ok'      => false,
+                'equipos' => [],
+                'error'   => 'STELLUM_BRIDGE_URL no está configurada en .env (ej. https://app.astronmx.cloud/api/captura-bridge). Recuerda ejecutar php artisan config:clear.',
+            ];
+        }
+
         try {
             $response = Http::withToken($this->token)
                 ->timeout(15)
