@@ -198,8 +198,9 @@
                 });
             }
 
-            // Inicializar Laravel Echo conectado a Laravel Reverb
-            if (typeof Pusher !== 'undefined' && typeof Echo !== 'undefined') {
+            // Inicializar Laravel Echo conectado a Laravel Reverb solo si BROADCAST_CONNECTION=reverb
+            const reverbActivo = {{ config('broadcasting.default') === 'reverb' ? 'true' : 'false' }};
+            if (reverbActivo && typeof Pusher !== 'undefined' && typeof Echo !== 'undefined') {
                 try {
                     const reverbKey = '{{ config("broadcasting.connections.reverb.key", env("REVERB_APP_KEY", "")) }}';
                     const reverbHost = '{{ config("broadcasting.connections.reverb.options.host", env("REVERB_HOST", "127.0.0.1")) }}';

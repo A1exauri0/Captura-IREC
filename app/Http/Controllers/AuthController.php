@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PcCaptura;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class AuthController extends Controller
 {
@@ -16,8 +18,12 @@ class AuthController extends Controller
             if ($user->hasRole('Captura') && !$user->hasAnyRole(['superadmin', 'administrador'])) {
                 return redirect()->route('admin.captura.index');
             }
+            if ($user->hasAnyRole(['superadmin', 'administrador'])) {
+                return redirect()->route('admin.dashboard.avance');
+            }
             return redirect()->route('admin.analytics_sellos.reportes.lotes_trabajando');
         }
+
         return view('auth.login');
     }
 
@@ -37,12 +43,19 @@ class AuthController extends Controller
             ->first();
 
         if ($user && Hash::check($password, $user->password)) {
+            $esCapturista = $user->hasRole('Captura') && !$user->hasAnyRole(['superadmin', 'administrador']);
+
             Auth::login($user, true);
             $request->session()->regenerate();
+            $request->session()->forget('pc_seleccionada');
 
-            // Los capturistas siempre van directo a la Estación de Captura (sin intended a /admin/*)
-            if ($user->hasRole('Captura') && !$user->hasAnyRole(['superadmin', 'administrador'])) {
+            // Los capturistas siempre van directo a la Estación de Captura (donde el modal pide su número de PC)
+            if ($esCapturista) {
                 return redirect()->route('admin.captura.index');
+            }
+
+            if ($user->hasAnyRole(['superadmin', 'administrador'])) {
+                return redirect()->intended(route('admin.dashboard.avance'));
             }
 
             return redirect()->intended(route('admin.analytics_sellos.reportes.lotes_trabajando'));

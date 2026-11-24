@@ -13,6 +13,7 @@ use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\FlujoStellumController;
 use App\Http\Controllers\InventarioEquiposController;
 use App\Http\Controllers\DashboardAvanceController;
+use App\Http\Controllers\PcCapturaController;
 
 // =========================================================================
 // AUTENTICACIÓN
@@ -42,7 +43,10 @@ Route::middleware(['auth'])->group(function () {
         // Estación de captura y validación de PDFs
         Route::name('admin.captura.')->group(function () {
             Route::get('/', [CapturaController::class, 'index'])->name('index');
+            Route::post('/seleccionar-pc', [CapturaController::class, 'seleccionarPc'])->name('seleccionarPc');
             Route::get('/buscar-pdf', [CapturaController::class, 'buscarPdf'])->name('buscarPdf');
+            Route::post('/admin-siguiente', [CapturaController::class, 'adminSiguientePdf'])->name('adminSiguiente');
+            Route::post('/admin-buscar-mismo-hash', [CapturaController::class, 'adminBuscarMismoHash'])->name('adminBuscarMismoHash');
             Route::get('/ver-pdf', [CapturaController::class, 'verPdf'])->name('verPdf');
             Route::get('/localidades', [CapturaController::class, 'obtenerLocalidades'])->name('localidades');
             Route::post('/renombrar', [CapturaController::class, 'renombrar'])->name('renombrar');
@@ -69,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Dashboard Ejecutivo de Avance Global (exclusivo Administrador / Superadmin)
         Route::get('/dashboard-avance', [DashboardAvanceController::class, 'index'])->name('admin.dashboard.avance');
+        Route::get('/dashboard-avance/datos', [DashboardAvanceController::class, 'datos'])->name('admin.dashboard.avance.datos');
 
         // Centro de autorizaciones en tiempo real (WebSockets)
         Route::name('admin.autorizaciones.')->prefix('autorizaciones')->group(function () {
@@ -223,6 +228,14 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [FlujoStellumController::class, 'asignaciones'])->name('index');
             Route::post('/', [FlujoStellumController::class, 'guardarAsignacion'])->name('guardar');
             Route::delete('/{id}', [FlujoStellumController::class, 'eliminarAsignacion'])->name('eliminar');
+        });
+
+        // Catálogo de Números de PC para selección al iniciar sesión
+        Route::name('admin.pcs.')->prefix('pcs')->group(function () {
+            Route::get('/', [PcCapturaController::class, 'index'])->name('index');
+            Route::post('/', [PcCapturaController::class, 'store'])->name('store');
+            Route::put('/{id}', [PcCapturaController::class, 'update'])->name('update');
+            Route::delete('/{id}', [PcCapturaController::class, 'destroy'])->name('destroy');
         });
 
         // Inventario de Equipos sincronizado en tiempo real con Stellum + Asignación de PC por Usuario

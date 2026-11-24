@@ -8,9 +8,9 @@
         padding: 4px 8px !important;
         border-radius: 6px !important;
     }
-    .badge-renombrar { background-color: #d1e7dd !important; color: #0f5132 !important; border: 1px solid #badbcc !important; }
-    .badge-validado { background-color: #cff4fc !important; color: #055160 !important; border: 1px solid #b6effb !important; }
-    .badge-duplicar { background-color: #f8d7da !important; color: #842029 !important; border: 1px solid #f5c2c7 !important; }
+    .badge-renombrar { background-color: #dbeafe !important; color: #0369a1 !important; border: 1px solid #93c5fd !important; }
+    .badge-validado { background-color: #d1fae5 !important; color: #047857 !important; border: 1px solid #6ee7b7 !important; }
+    .badge-duplicar { background-color: #fee2e2 !important; color: #b91c1c !important; border: 1px solid #fca5a5 !important; }
     .badge-otro { background-color: #fff3cd !important; color: #664d03 !important; border: 1px solid #ffecb5 !important; }
 
     .table-busqueda {

@@ -233,13 +233,11 @@
 
             // COLORES POR ACCIÓN
             function getColorByAction(accion) {
-                const lower = accion.toLowerCase();
-                if (lower.includes('validado')) return 'rgb(192, 255, 192)';
-                if (lower.includes('renombrar') || lower.includes('renombrado')) return 'rgb(222, 184, 135)';
-                if (lower.includes('eliminar') || lower.includes('eliminado')) return 'rgb(255, 128, 128)';
-                if (lower.includes('inconsistencia')) return 'rgb(255, 255, 192)';
-                if (lower.includes('duplicar') || lower.includes('duplicado')) return 'rgb(192, 235, 255)';
-                return 'rgb(60, 179, 113)';
+                const lower = String(accion || '').toLowerCase();
+                if (lower.includes('valid')) return '#10b981';
+                if (lower.includes('renombr')) return '#0284c7';
+                if (lower.includes('inconsistencia') || lower.includes('recorte') || lower.includes('eliminar') || lower.includes('eliminado')) return '#ef4444';
+                return '#64748b';
             }
 
             let abortController;
@@ -600,21 +598,17 @@
                 const mapAcciones = {
                     'Validado': 0,
                     'Renombrar': 0,
-                    'Eliminado': 0,
                     'Inconsistencia': 0
                 };
 
                 accionesGlobal.forEach(x => {
+                    const lower = String(x.accion || '').toLowerCase();
                     let nombre = x.accion;
-                    if (nombre.toLowerCase().includes('inconsistencia')) {
-                        nombre = 'Inconsistencia';
-                    }
+                    if (lower.includes('valid')) nombre = 'Validado';
+                    else if (lower.includes('renombr')) nombre = 'Renombrar';
+                    else if (lower.includes('inconsistencia')) nombre = 'Inconsistencia';
                     if (nombre in mapAcciones) {
                         mapAcciones[nombre] += x.total;
-                    }
-                    if (nombre.toLowerCase().includes('validado') || nombre.toLowerCase().includes('renombrar')) {
-                        totalCalidad += x.total;
-                        totalCalidadImagenes += x.paginas || 0;
                     }
                 });
 
@@ -634,30 +628,6 @@
                                                 `;
                     container.insertAdjacentHTML('beforeend', cardHtml);
                 });
-
-                const calidadNotariasHtml = `
-                                                <div class="mb-3 px-2" style="flex: 1 1 0px; min-width: 150px;">
-                                                    <div class="card border-0 shadow-sm" style="border-radius: 12px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff; height: 100%;">
-                                                        <div class="card-body p-3 d-flex flex-column justify-content-center">
-                                                            <p class="text-xs uppercase tracking-wider font-semibold mb-1" style="font-size: 0.75rem; color: #a7f3d0; font-weight: 600; margin-bottom: 0.25rem;">Calidad Notarías</p>
-                                                            <h3 class="text-2xl font-bold" style="font-size: 1.5rem; font-weight: 700; color: #ffffff; margin: 0;">${formatearNumero(totalCalidad)}</h3>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            `;
-                container.insertAdjacentHTML('beforeend', calidadNotariasHtml);
-
-                const calidadImagenesHtml = `
-                                                <div class="mb-3 px-2" style="flex: 1 1 0px; min-width: 150px;">
-                                                    <div class="card border-0 shadow-sm" style="border-radius: 12px; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff; height: 100%;">
-                                                        <div class="card-body p-3 d-flex flex-column justify-content-center">
-                                                            <p class="text-xs uppercase tracking-wider font-semibold mb-1" style="font-size: 0.75rem; color: #ddd6fe; font-weight: 600; margin-bottom: 0.25rem;">Imágenes en Calidad </p>
-                                                            <h3 class="text-2xl font-bold" style="font-size: 1.5rem; font-weight: 700; color: #ffffff; margin: 0;">${formatearNumero(totalCalidadImagenes)}</h3>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            `;
-                container.insertAdjacentHTML('beforeend', calidadImagenesHtml);
             }
 
             cargarDashboard();

@@ -29,11 +29,12 @@ const CapturaProcesos = (() => {
         ctx.historialCapturas = [];
         ctx.pdfFueRenombrado = false;
 
-        if (ctx.delSeleccionada && ctx.delSeleccionada.clave) {
-            ctx.txtNombre.value = ctx.delSeleccionada.clave + "_";
-        } else {
-            ctx.txtNombre.value = "";
-        }
+        // Limpiar todos los inputs segmentados de Sellos y su preview
+        document.querySelectorAll('.sello-seg').forEach(el => { el.value = ''; });
+        const previewEl = document.getElementById('lblPreviewNombreSellos');
+        if (previewEl) previewEl.textContent = '—';
+
+        ctx.txtNombre.value = "";
         ctx.txtNombre.classList.remove(
             "border-red-500",
             "border-green-500",
@@ -45,7 +46,9 @@ const CapturaProcesos = (() => {
         ctx.txtNombre.dispatchEvent(new Event('input'));
 
         if (ctx.loteActualId) {
-            ctx.txtNombre.focus();
+            const primerSeg = document.getElementById('selloDel');
+            if (primerSeg) primerSeg.focus();
+            else ctx.txtNombre.focus();
         }
 
         const lblCaptura = document.getElementById("lblCaptura");
@@ -76,10 +79,73 @@ const CapturaProcesos = (() => {
     }
 
     /**
+     * Si el PDF actual pertenece a un grupo de mismo hash, precarga automáticamente
+     * el número de registro (Inscr.) en la casilla #selloInscr.
+     */
+    function precargarNumeroRegistroSiGrupoHash(ctx) {
+        if (!ctx.listaPdfs || ctx.listaPdfs.length <= 1) return;
+        const actual = ctx.listaPdfs[ctx.indiceActual];
+        if (!actual || !actual.etiqueta_boton) return;
+        const inputInscr = document.getElementById("selloInscr");
+        if (inputInscr) {
+            inputInscr.value = String(actual.etiqueta_boton).slice(0, 4);
+            inputInscr.dispatchEvent(new Event("input"));
+        }
+    }
+
+    /**
+     * Renderiza la barra de botones cuando varios PDFs comparten el mismo hash
+     * para permitir capturar múltiples nombres/registros viendo el mismo PDF.
+     */
+    function renderizarBarraGrupoHash(ctx) {
+        const barra = document.getElementById("barraGrupoHash");
+        const titulo = document.getElementById("lblTituloGrupoHash");
+        const cont = document.getElementById("contenedorBotonesHash");
+        if (!barra || !cont) return;
+
+        if (!ctx.listaPdfs || ctx.listaPdfs.length <= 1) {
+            barra.classList.add("hidden");
+            cont.innerHTML = "";
+            return;
+        }
+
+        barra.classList.remove("hidden");
+        if (titulo) {
+            titulo.textContent = `Mismo PDF (${ctx.listaPdfs.length} registros pendientes):`;
+        }
+        cont.innerHTML = "";
+
+        ctx.listaPdfs.forEach((item, idx) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            const activo = idx === ctx.indiceActual;
+            const etiqueta = item.etiqueta_boton || String(idx + 1).padStart(4, "0");
+            btn.className = activo
+                ? "px-2.5 py-1 rounded-md font-mono font-extrabold text-xs bg-sky-600 text-white shadow ring-2 ring-sky-400"
+                : "px-2.5 py-1 rounded-md font-mono font-bold text-xs bg-white dark:bg-gray-800 text-indigo-800 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition";
+            btn.textContent = etiqueta;
+            btn.title = `Cambiar al registro ${etiqueta} (mismo PDF)`;
+            btn.addEventListener("click", () => {
+                if (ctx.indiceActual === idx) return;
+                ctx.indiceActual = idx;
+                ctx.loteActualId = item.sesion_id || ctx.loteActualId;
+                ctx.loteActualNombre = item.nombre || ctx.loteActualNombre;
+                renderizarBarraGrupoHash(ctx);
+                reiniciarCaptura(ctx);
+                precargarNumeroRegistroSiGrupoHash(ctx);
+                ctx.historialCapturas.push((item.nombre || "").replace(/-/g, "_"));
+                console.log("[Captura-IREC] Nombre del PDF:", item.nombre || null);
+            });
+            cont.appendChild(btn);
+        });
+    }
+
+    /**
      * Carga el PDF actual en el iframe visor.
      * @param {object} ctx - Contexto de ejecución.
      */
     function cargarPdfActual(ctx) {
+        renderizarBarraGrupoHash(ctx);
         if (ctx.listaPdfs.length === 0 || ctx.indiceActual < 0) {
             ctx.lblEstado.innerHTML =
                 '<span class="text-gray-500">No hay más PDFs en este lote</span>';
@@ -93,7 +159,8 @@ const CapturaProcesos = (() => {
         const pdf = ctx.listaPdfs[ctx.indiceActual];
         const url = CapturaArchivos.urlVerPdf(ctx.dirSeleccionado.id, pdf.ruta);
 
-        console.log('[Captura-IREC] Registro PDF obtenido para captura:', {
+        console.log(' Nombre del PDF:', pdf.nombre || null);
+        console.log(' Registro PDF obtenido para captura:', {
             sesion_id: pdf.sesion_id || ctx.loteActualId || null,
             indice_pdf_id: pdf.indice_pdf_id || null,
             nombre_archivo: pdf.nombre || null,
@@ -135,11 +202,12 @@ const CapturaProcesos = (() => {
                 setTimeout(() => ocultarCargando(), 800);
 
                 reiniciarCaptura(ctx);
+                precargarNumeroRegistroSiGrupoHash(ctx);
                 ctx.historialCapturas.push(pdf.nombre.replace(/-/g, "_"));
             })
             .catch(async err => {
                 ocultarCargando();
-                console.error("[Captura-IREC] No se pudo cargar el PDF:", err);
+                console.error(" No se pudo cargar el PDF:", err);
 
                 // Mostrar modal de confirmación si no se detecta el archivo
                 const pasarSiguiente = await ctx.solicitarConfirmacion(
@@ -162,13 +230,30 @@ const CapturaProcesos = (() => {
      * @param {object} ctx - Contexto de ejecución.
      */
     async function avanzarSiguiente(ctx) {
+        const anterior = ctx.listaPdfs[ctx.indiceActual] || null;
+        const hashAnterior = anterior ? anterior.hash : null;
+
         ctx.listaPdfs.splice(ctx.indiceActual, 1);
         if (ctx.listaPdfs.length > 0) {
             if (ctx.indiceActual >= ctx.listaPdfs.length) {
-                ctx.indiceActual = ctx.listaPdfs.length - 1;
+                ctx.indiceActual = 0;
+            }
+            const siguiente = ctx.listaPdfs[ctx.indiceActual];
+            ctx.loteActualId = siguiente.sesion_id || ctx.loteActualId;
+            ctx.loteActualNombre = siguiente.nombre || ctx.loteActualNombre;
+
+            // Si el siguiente PDF tiene exactamente el mismo hash, NO recargar el visor (cambio instantáneo)
+            if (hashAnterior && siguiente && siguiente.hash && siguiente.hash === hashAnterior) {
+                renderizarBarraGrupoHash(ctx);
+                reiniciarCaptura(ctx);
+                precargarNumeroRegistroSiGrupoHash(ctx);
+                ctx.historialCapturas.push((siguiente.nombre || "").replace(/-/g, "_"));
+                console.log("[Captura-IREC] Nombre del PDF:", siguiente.nombre || null);
+                return;
             }
             cargarPdfActual(ctx);
         } else {
+            renderizarBarraGrupoHash(ctx);
             await cargarLoteDesdeServidor(ctx);
         }
     }
@@ -324,7 +409,7 @@ const CapturaProcesos = (() => {
                 ctx.dirSeleccionado.id,
                 delegacionId,
             );
-            console.log('[Captura-IREC] Respuesta /captura/buscar-pdf:', resp);
+            console.log(' Respuesta /captura/buscar-pdf:', resp);
             if (!resp.ok) {
                 ocultarCargando();
                 ctx.lblTotalPdf.innerText =
@@ -354,7 +439,21 @@ const CapturaProcesos = (() => {
             cargarPdfActual(ctx);
         } catch (err) {
             ocultarCargando();
-            console.error('[Captura-IREC] Error en cargarLoteDesdeServidor:', err);
+            console.error(' Error en cargarLoteDesdeServidor:', err);
+            if (String(err.message || '').includes('fuera_horario')) {
+                let msg = 'Tu horario laboral ha finalizado o aún no inicia.';
+                try {
+                    const idxJson = err.message.indexOf('{');
+                    if (idxJson !== -1) {
+                        const parsed = JSON.parse(err.message.slice(idxJson));
+                        if (parsed.mensaje) msg = parsed.mensaje;
+                    }
+                } catch (_) {}
+                if (typeof window.bloquearPorHorario === 'function') {
+                    window.bloquearPorHorario(msg);
+                    return;
+                }
+            }
             ctx.lblTotalPdf.innerText = "Error al buscar PDF";
             ctx.lblEstado.innerHTML = `<span class="text-red-500">${err.message}</span>`;
         }
@@ -388,22 +487,41 @@ const CapturaProcesos = (() => {
         if (capturado.toLowerCase() === pdf.nombre.toLowerCase()) {
             const rutaArchivoOriginal = pdf.ruta_origen || pdf.ruta;
 
-            // Avanzar inmediatamente en la interfaz
-            avanzarSiguiente(ctx);
+            mostrarCargando("Validando captura...");
             ctx.lblEstado.innerHTML =
                 '<span class="text-green-600 dark:text-green-400 font-bold">Validando... ✅</span>';
 
-            // Ejecutar en segundo plano (registra en auditoria_sellos y cierra archivos_sesiones)
-            CapturaArchivos.validar(
-                ctx.dirSeleccionado.id,
-                rutaArchivoOriginal,
-                ctx.delSeleccionada ? ctx.delSeleccionada.id : null,
-                ctx.loteActualNombre,
-                { ...metaPdf, detalles: 'Validado en primera captura' },
-            )
-                .catch((err) => {
-                    console.error("Error al validar: " + err.message);
-                });
+            try {
+                const respVal = await CapturaArchivos.validar(
+                    ctx.dirSeleccionado.id,
+                    rutaArchivoOriginal,
+                    ctx.delSeleccionada ? ctx.delSeleccionada.id : null,
+                    ctx.loteActualNombre,
+                    { ...metaPdf, detalles: 'Validado en primera captura' },
+                );
+                ocultarCargando();
+                reiniciarCaptura(ctx);
+
+                if (respVal && respVal.fuera_horario_despues_de_guardar) {
+                    await ctx.solicitarConfirmacion(
+                        "Fin de horario laboral",
+                        respVal.aviso_horario || "Tu turno ha finalizado. Este último registro se guardó correctamente, pero ya no podrás capturar más.",
+                        "fa-clock",
+                        "text-amber-500",
+                        false,
+                    );
+                    if (typeof window.bloquearPorHorario === 'function') {
+                        window.bloquearPorHorario(respVal.aviso_horario);
+                    }
+                    return;
+                }
+
+                avanzarSiguiente(ctx);
+            } catch (err) {
+                ocultarCargando();
+                console.error("Error al validar: " + err.message);
+                ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message}</span>`;
+            }
             return;
         }
 
@@ -462,8 +580,23 @@ const CapturaProcesos = (() => {
                     nuevoNombre,
                     { ...metaPdf, detalles: 'Renombrado y validado en doble captura' },
                 )
-                    .then((respRen) => {
+                    .then(async (respRen) => {
                         if (respRen.ok) {
+                            reiniciarCaptura(ctx);
+                            if (respRen.fuera_horario_despues_de_guardar) {
+                                ocultarCargando();
+                                await ctx.solicitarConfirmacion(
+                                    "Fin de horario laboral",
+                                    respRen.aviso_horario || "Tu turno ha finalizado. Este último registro se guardó correctamente, pero ya no podrás capturar más.",
+                                    "fa-clock",
+                                    "text-amber-500",
+                                    false,
+                                );
+                                if (typeof window.bloquearPorHorario === 'function') {
+                                    window.bloquearPorHorario(respRen.aviso_horario);
+                                }
+                                return;
+                            }
                             avanzarSiguiente(ctx);
                         }
                     })
@@ -567,7 +700,7 @@ const CapturaProcesos = (() => {
                         const indexCoincidente = ctx.listaPdfs.findIndex(
                             (p) =>
                                 p.nombre.replace(/-/g, "_").toLowerCase() ===
-                                    nuevoNombreDuplicado.toLowerCase() &&
+                                nuevoNombreDuplicado.toLowerCase() &&
                                 p.ruta !== rutaOriginal,
                         );
                         if (indexCoincidente >= 0) {

@@ -26,9 +26,134 @@
 <body
     class="h-screen w-screen overflow-hidden bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans selection:bg-brand selection:text-white">
 
+    <!-- Bloqueo responsivo para celulares / pantallas pequeñas (< 768px) -->
+    <div id="overlayBloqueoMovil" class="md:hidden fixed inset-0 z-[100] bg-slate-900 text-slate-100 flex items-center justify-center p-6">
+        <div class="max-w-sm w-full bg-slate-800 border border-slate-700 rounded-2xl p-6 text-center shadow-2xl space-y-3">
+            <div class="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-desktop"></i>
+            </div>
+            <h2 class="text-lg font-bold text-white">Solo disponible en computadora</h2>
+            <p class="text-xs text-slate-300">
+                La Estación de Captura no puede utilizarse desde celulares ni pantallas pequeñas.
+            </p>
+            <button type="button" onclick="document.getElementById('logout-form').submit();"
+                class="w-full py-2 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs">
+                <i class="fa-solid fa-right-from-bracket mr-1"></i> Cerrar Sesión
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal obligatorio de selección de Número de PC al entrar a la Estación de Captura -->
+    <div id="modalSeleccionPc" class="hidden fixed inset-0 z-[95] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
+                <div class="w-11 h-11 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-computer"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">Selecciona tu Número de PC</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Indica en qué equipo vas a capturar durante esta sesión.</p>
+                </div>
+            </div>
+            <div>
+                <label for="selectNumeroPcModal" class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1.5">Número de PC *</label>
+                <select id="selectNumeroPcModal" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-600 focus:outline-none">
+                    <option value="">-- Selecciona tu PC --</option>
+                    @foreach(($pcsDisponibles ?? []) as $pc)
+                        <option value="{{ $pc->numero_pc }}">
+                            {{ $pc->numero_pc }}{{ $pc->ubicacion ? ' — ' . $pc->ubicacion : '' }}{{ $pc->no_serie ? ' (SN: ' . $pc->no_serie . ')' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p id="lblErrorPcModal" class="hidden text-xs text-rose-600 font-semibold mt-1.5"></p>
+            </div>
+            <div class="flex justify-end gap-2 pt-1">
+                <button type="button" onclick="document.getElementById('logout-form').submit();"
+                    class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold">
+                    Salir
+                </button>
+                <button type="button" id="btnConfirmarPcModal"
+                    class="px-5 py-2 rounded-lg bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i> Confirmar PC y Comenzar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bloqueo por horario laboral (controlado por servidor y frontend) -->
+    <div id="overlayBloqueoHorario" class="hidden fixed inset-0 z-[90] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="max-w-md w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center shadow-2xl space-y-4">
+            <div class="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto text-3xl">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white">Horario Laboral Finalizado / Bloqueado</h2>
+            <p id="lblMensajeBloqueoHorario" class="text-sm text-slate-600 dark:text-slate-300">
+                Te encuentras fuera de tu horario laboral asignado.
+            </p>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono font-bold text-sky-700 dark:text-sky-300">
+                <i class="fa-regular fa-clock"></i>
+                <span>Hora servidor:</span>
+                <span id="relojServidorBloqueo">--:--:--</span>
+            </div>
+            <div class="pt-2">
+                <button type="button" onclick="document.getElementById('logout-form').submit();"
+                    class="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm">
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i> Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="flex flex-col h-full w-full">
+        <!-- Barra de Filtros Visuales del PDF (estilo Stellum: Normal, Dark Reader, Alto Contraste, Tinta Tenue, B&N, Negativo + Sliders) -->
+        <div id="barraFiltrosPdf" class="bg-slate-800 dark:bg-slate-950 text-slate-200 px-3 py-1 border-b border-slate-700 flex items-center justify-between text-xs shrink-0 gap-2 flex-wrap select-none">
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-slate-400 font-semibold text-[11px]"><i class="fa-solid fa-wand-magic-sparkles text-amber-400 mr-1"></i>Filtro:</span>
+                <button type="button" onclick="seleccionarPresetVisor('normal')" id="btnMainPreset-normal" class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-600 text-white transition">Normal</button>
+                <button type="button" onclick="seleccionarPresetVisor('dark_reader')" id="btnMainPreset-dark_reader" class="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition flex items-center gap-1" title="Fondo oscuro cálido respetando tintas"><i class="fa-solid fa-moon text-indigo-400"></i> Dark Reader</button>
+                <button type="button" onclick="seleccionarPresetVisor('alto_contraste')" id="btnMainPreset-alto_contraste" class="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition" title="Contraste 160%">Alto Contraste</button>
+                <button type="button" onclick="seleccionarPresetVisor('tinta_tenue')" id="btnMainPreset-tinta_tenue" class="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition" title="Contraste 220% + B&N">Tinta Tenue</button>
+                <button type="button" onclick="seleccionarPresetVisor('blanco_negro')" id="btnMainPreset-blanco_negro" class="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition" title="Blanco y negro nítido">B&amp;N Nítido</button>
+                <button type="button" onclick="seleccionarPresetVisor('modo_oscuro')" id="btnMainPreset-modo_oscuro" class="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition" title="Negativo / Invertido">Negativo</button>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-1 bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-700">
+                    <span class="text-slate-400 text-[10px]">Contraste:</span>
+                    <input type="range" id="mainRngContraste" min="50" max="300" step="5" value="100" oninput="actualizarFiltroDesdeSlidersMain()" class="w-16 h-1 bg-slate-700 rounded cursor-pointer accent-sky-500">
+                    <span id="mainLblContraste" class="font-mono text-sky-400 font-bold text-[10px] w-8 text-right">100%</span>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-700">
+                    <span class="text-slate-400 text-[10px]">Brillo:</span>
+                    <input type="range" id="mainRngBrillo" min="50" max="200" step="5" value="100" oninput="actualizarFiltroDesdeSlidersMain()" class="w-14 h-1 bg-slate-700 rounded cursor-pointer accent-amber-500">
+                    <span id="mainLblBrillo" class="font-mono text-amber-400 font-bold text-[10px] w-8 text-right">100%</span>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-900/70 px-1.5 py-0.5 rounded border border-slate-700">
+                    <span class="text-slate-400 text-[10px]">Sepia:</span>
+                    <input type="range" id="mainRngSepia" min="0" max="100" step="5" value="0" oninput="actualizarFiltroDesdeSlidersMain()" class="w-12 h-1 bg-slate-700 rounded cursor-pointer accent-amber-600">
+                    <span id="mainLblSepia" class="font-mono text-amber-300 font-bold text-[10px] w-7 text-right">0%</span>
+                </div>
+                <button type="button" onclick="seleccionarPresetVisor('normal')" class="text-slate-400 hover:text-white text-[10px] px-1" title="Restablecer filtros a Normal">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <!-- Reloj grande del Servidor (arriba a la derecha) -->
+                <div class="flex items-center gap-1.5 bg-slate-900 px-3 py-0.5 rounded-lg border border-sky-500/50 shadow-sm ml-1" title="Hora oficial del servidor ({{ $servidorZonaHoraria ?? 'America/Mexico_City' }})">
+                    <i class="fa-regular fa-clock text-sky-400 text-sm"></i>
+                    <span id="relojServidor" class="font-mono font-extrabold text-base sm:text-lg tracking-wider text-white">--:--:--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Banner de Aviso en Tiempo Real (10 min antes de terminar turno) -->
+        <div id="alertaFinTurno" class="hidden px-4 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-between gap-2 shrink-0 shadow">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-bell fa-shake"></i>
+                <span id="lblAlertaFinTurno">Tu turno está por finalizar.</span>
+            </div>
+            <span id="lblCuentaRegresivaTurno" class="font-mono font-extrabold px-2 py-0.5 rounded bg-slate-950/15">10:00</span>
+        </div>
+
         <!-- Visor de PDF -->
-        <iframe class="flex-grow w-full border-none bg-white" id="pdfViewer" src="about:blank"></iframe>
+        <iframe class="flex-grow w-full border-none bg-white dark:bg-slate-900" id="pdfViewer" src="about:blank"></iframe>
 
         <!-- Splitter -->
         <div
@@ -56,6 +181,17 @@
                 </div>
 
                 <div class="flex items-center gap-2 shrink-0">
+                    @if(auth()->user()?->hasAnyRole(['superadmin', 'administrador']))
+                        <button id="btnAdminSiguiente" type="button" title="Saltar al siguiente PDF libre (solo Administrador)"
+                            class="h-8 px-2.5 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded border border-sky-700 flex items-center gap-1.5">
+                            <i class="fa-solid fa-forward-step"></i> Siguiente
+                        </button>
+                        <button id="btnAdminBuscarHash" type="button" title="Buscar un grupo de varios PDFs con el mismo hash (solo Administrador)"
+                            class="h-8 px-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded border border-indigo-700 flex items-center gap-1.5">
+                            <i class="fa-solid fa-layer-group"></i> Mismo Hash
+                        </button>
+                    @endif
+
                     <!-- Rotación física con página editable -->
                     <div class="flex items-center gap-1 bg-white dark:bg-gray-900 px-2 py-1 rounded border border-gray-300 dark:border-gray-600">
                         <span class="text-xs font-bold text-gray-600 dark:text-gray-300 mr-1">Rotar:</span>
@@ -85,6 +221,15 @@
                         <i class="fa-solid fa-power-off"></i> Salir
                     </button>
                 </div>
+            </div>
+
+            <!-- BARRA DE GRUPO POR MISMO HASH (visible solo cuando hay varios PDFs idénticos con distinto registro) -->
+            <div id="barraGrupoHash" class="hidden flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-700 text-xs">
+                <span class="font-bold text-indigo-800 dark:text-indigo-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span id="lblTituloGrupoHash">Mismo PDF (0 registros):</span>
+                </span>
+                <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5"></div>
             </div>
 
             <!-- FILA 2: Solo los 9 Inputs de la Regla de Sellos (Form1.vb: Del, Secc, Libro, Tomo, Vol, Fracc, Año, Inscr, Bis) -->
@@ -831,35 +976,59 @@
         // document.getElementById('btnDuplicar')?.addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
         document.getElementById('btnLimpiar')?.addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
         document.getElementById('btnRefrescar')?.addEventListener('click', () => {
-            const visor = document.getElementById("pdfViewer");
-            if (visor && visor.src && visor.src !== "about:blank" && visor.src !== "") {
-                let urlString = visor.src;
-                visor.src = "about:blank";
-                setTimeout(() => {
-                    try {
-                        const url = new URL(urlString);
-                        url.searchParams.set('t', Date.now());
-                        visor.src = url.toString();
-                    } catch (e) {
-                        const base = urlString.split('?')[0];
-                        const query = urlString.split('?')[1] || "";
-                        const params = new URLSearchParams(query);
-                        params.set('t', Date.now());
-                        visor.src = base + "?" + params.toString();
-                    }
-                }, 50);
+            if (ctx.listaPdfs && ctx.listaPdfs.length > 0 && ctx.indiceActual >= 0) {
+                CapturaProcesos.cargarPdfActual(ctx);
             } else {
-                if (ctx.listaPdfs && ctx.listaPdfs.length > 0 && ctx.indiceActual >= 0) {
-                    const pdf = ctx.listaPdfs[ctx.indiceActual];
-                    const url = CapturaArchivos.urlVerPdf(ctx.dirSeleccionado.id, pdf.ruta);
-                    visor.src = "about:blank";
-                    setTimeout(() => {
-                        visor.src = url + "&t=" + Date.now();
-                    }, 50);
-                }
+                CapturaProcesos.cargarLoteDesdeServidor(ctx);
             }
         });
         document.getElementById('btnCerrarSesion')?.addEventListener('click', () => CapturaProcesos.cerrarSesion(ctx));
+
+        // Botones exclusivos de Administrador / Superadmin (Siguiente PDF y Buscar grupo por mismo Hash)
+        async function ejecutarAccionAdminPdf(url, mensajeCarga) {
+            const modalProc = document.getElementById('modalProcesando');
+            const lblProc = document.getElementById('lblProcesandoMensaje');
+            if (modalProc && lblProc) {
+                lblProc.innerText = mensajeCarga;
+                modalProc.classList.remove('hidden');
+            }
+            try {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await resp.json();
+                console.log('[Captura-IREC] Respuesta acción admin:', data);
+                if (!resp.ok || !data.ok) {
+                    throw new Error(data.mensaje || 'No se pudo obtener el PDF.');
+                }
+                if (data.delegacion) {
+                    ctx.delSeleccionada = data.delegacion;
+                }
+                ctx.loteActualId = data.lote_id;
+                ctx.loteActualNombre = data.lote;
+                ctx.listaPdfs = data.archivos || [];
+                ctx.indiceActual = 0;
+                ctx.lblTotalPdf.innerText = ctx.delSeleccionada ? ctx.delSeleccionada.nombre : 'Delegación';
+                CapturaProcesos.reiniciarCaptura(ctx);
+                CapturaProcesos.cargarPdfActual(ctx);
+            } catch (err) {
+                if (modalProc) modalProc.classList.add('hidden');
+                ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">${err.message}</span>`;
+            }
+        }
+
+        document.getElementById('btnAdminSiguiente')?.addEventListener('click', () => {
+            ejecutarAccionAdminPdf("{{ route('admin.captura.adminSiguiente') }}", "Buscando siguiente PDF...");
+        });
+        document.getElementById('btnAdminBuscarHash')?.addEventListener('click', () => {
+            ejecutarAccionAdminPdf("{{ route('admin.captura.adminBuscarMismoHash') }}", "Buscando grupo de PDFs con el mismo hash...");
+        });
 
         // Rotación física de página con modal de confirmación y registro en auditoría
         async function confirmarYRotarPagina(grados) {
@@ -1038,8 +1207,18 @@
                 }
             });
 
+            let mantenerCursorAlFinal = false;
+
             campos.forEach((campo, idx) => {
-                campo.addEventListener('focus', () => campo.select());
+                campo.addEventListener('focus', () => {
+                    if (mantenerCursorAlFinal) {
+                        mantenerCursorAlFinal = false;
+                        const len = campo.value.length;
+                        campo.setSelectionRange(len, len);
+                    } else {
+                        campo.select();
+                    }
+                });
 
                 // Filtrado interactivo de teclas idéntico a Form1.vb (TextBoxDinamico_KeyPress)
                 campo.addEventListener('beforeinput', (e) => {
@@ -1188,8 +1367,16 @@
                     } else if (retrocede && idx > 0) {
                         e.preventDefault();
                         e.stopPropagation();
-                        campos[idx - 1].focus();
-                        campos[idx - 1].select();
+                        const prev = campos[idx - 1];
+                        if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'ArrowLeft') {
+                            mantenerCursorAlFinal = true;
+                            prev.focus();
+                            const len = prev.value.length;
+                            prev.setSelectionRange(len, len);
+                        } else {
+                            prev.focus();
+                            prev.select();
+                        }
                     }
                 });
             });
@@ -1219,19 +1406,111 @@
         });
 
         // ==================================================
-        // COMPORTAMIENTOS ORIGINALES DEL USUARIO (CONSERVADOS Y OPTIMIZADOS)
+        // MODO CLARO / OSCURO (persistente) + FILTROS DE VISIÓN DEL PDF
         // ==================================================
-        btnModo.addEventListener('click', () => {
-            if (htmlEl.classList.contains('dark')) {
-                htmlEl.classList.remove('dark');
-                htmlEl.classList.add('light');
-                btnModo.innerHTML = '<i class="fa-solid fa-moon"></i> Oscuro';
-            } else {
+        function aplicarTemaCaptura(tema) {
+            if (tema === 'dark') {
                 htmlEl.classList.remove('light');
                 htmlEl.classList.add('dark');
-                btnModo.innerHTML = '<i class="fa-solid fa-sun"></i> Claro';
+                if (btnModo) btnModo.innerHTML = '<i class="fa-solid fa-sun"></i> Claro';
+            } else {
+                htmlEl.classList.remove('dark');
+                htmlEl.classList.add('light');
+                if (btnModo) btnModo.innerHTML = '<i class="fa-solid fa-moon"></i> Oscuro';
             }
+            localStorage.setItem('val_tema_captura', tema);
+        }
+
+        aplicarTemaCaptura(localStorage.getItem('val_tema_captura') || 'light');
+
+        btnModo?.addEventListener('click', () => {
+            aplicarTemaCaptura(htmlEl.classList.contains('dark') ? 'light' : 'dark');
         });
+
+        let filtroVisorEstado = {
+            preset: 'normal',
+            contraste: 100,
+            brillo: 100,
+            sepia: 0,
+            invertir: false,
+            hue_rotate: false,
+            grises: false
+        };
+
+        try {
+            const guardado = JSON.parse(localStorage.getItem('val_filtro_visor_pdf') || 'null');
+            if (guardado && typeof guardado === 'object') {
+                filtroVisorEstado = { ...filtroVisorEstado, ...guardado };
+            }
+        } catch (_) {}
+
+        function aplicarFiltroVisorMain() {
+            const visor = document.getElementById('pdfViewer');
+            const partes = [];
+            if (filtroVisorEstado.invertir) partes.push('invert(1)');
+            if (filtroVisorEstado.hue_rotate) partes.push('hue-rotate(180deg)');
+            if (filtroVisorEstado.grises) partes.push('grayscale(1)');
+            if (filtroVisorEstado.sepia > 0) partes.push(`sepia(${filtroVisorEstado.sepia}%)`);
+            partes.push(`contrast(${filtroVisorEstado.contraste}%)`);
+            partes.push(`brightness(${filtroVisorEstado.brillo}%)`);
+
+            if (visor) {
+                visor.style.filter = filtroVisorEstado.preset === 'normal' ? 'none' : partes.join(' ');
+            }
+
+            const rngC = document.getElementById('mainRngContraste');
+            const rngB = document.getElementById('mainRngBrillo');
+            const rngS = document.getElementById('mainRngSepia');
+            const lblC = document.getElementById('mainLblContraste');
+            const lblB = document.getElementById('mainLblBrillo');
+            const lblS = document.getElementById('mainLblSepia');
+            if (rngC) rngC.value = filtroVisorEstado.contraste;
+            if (rngB) rngB.value = filtroVisorEstado.brillo;
+            if (rngS) rngS.value = filtroVisorEstado.sepia;
+            if (lblC) lblC.textContent = filtroVisorEstado.contraste + '%';
+            if (lblB) lblB.textContent = filtroVisorEstado.brillo + '%';
+            if (lblS) lblS.textContent = filtroVisorEstado.sepia + '%';
+
+            ['normal', 'dark_reader', 'alto_contraste', 'tinta_tenue', 'blanco_negro', 'modo_oscuro'].forEach(p => {
+                const btn = document.getElementById('btnMainPreset-' + p);
+                if (!btn) return;
+                if (filtroVisorEstado.preset === p) {
+                    btn.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-600 text-white transition flex items-center gap-1';
+                } else {
+                    btn.className = 'px-2 py-0.5 rounded text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition flex items-center gap-1';
+                }
+            });
+
+            localStorage.setItem('val_filtro_visor_pdf', JSON.stringify(filtroVisorEstado));
+        }
+
+        window.seleccionarPresetVisor = function (preset) {
+            const PRESETS = {
+                normal:         { contraste: 100, brillo: 100, invertir: false, hue_rotate: false, sepia: 0,  grises: false },
+                dark_reader:    { contraste: 105, brillo: 92,  invertir: true,  hue_rotate: true,  sepia: 30, grises: false },
+                alto_contraste: { contraste: 160, brillo: 95,  invertir: false, hue_rotate: false, sepia: 0,  grises: false },
+                tinta_tenue:    { contraste: 220, brillo: 90,  invertir: false, hue_rotate: false, sepia: 0,  grises: true  },
+                blanco_negro:   { contraste: 180, brillo: 100, invertir: false, hue_rotate: false, sepia: 0,  grises: true  },
+                modo_oscuro:    { contraste: 120, brillo: 95,  invertir: true,  hue_rotate: false, sepia: 0,  grises: false }
+            };
+            const cfg = PRESETS[preset] || PRESETS.normal;
+            filtroVisorEstado = { preset, ...cfg };
+            aplicarFiltroVisorMain();
+        };
+
+        window.actualizarFiltroDesdeSlidersMain = function () {
+            const rngC = document.getElementById('mainRngContraste');
+            const rngB = document.getElementById('mainRngBrillo');
+            const rngS = document.getElementById('mainRngSepia');
+            if (!rngC || !rngB) return;
+            filtroVisorEstado.preset = 'personalizado';
+            filtroVisorEstado.contraste = parseInt(rngC.value, 10);
+            filtroVisorEstado.brillo = parseInt(rngB.value, 10);
+            filtroVisorEstado.sepia = rngS ? parseInt(rngS.value, 10) : 0;
+            aplicarFiltroVisorMain();
+        };
+
+        aplicarFiltroVisorMain();
 
         if (rbRegla1) {
             rbRegla1.addEventListener('change', () => {
@@ -1331,6 +1610,94 @@
         // Búsqueda completamente automática de lote al abrir la página (auto-selección de regla por asignación de usuario)
         const ASIGNACION_USUARIO = @json($asignacionUsuario ?? null);
         const CATALOGO_INCONSISTENCIAS = @json($catalogoInconsistencias ?? []);
+        const ESTADO_HORARIO = @json($estadoHorario ?? ['permitido' => true, 'en_horario' => true, 'mensaje' => null]);
+        const REQUIERE_SELECCION_PC = @json((bool) ($requiereSeleccionPc ?? false));
+        const SERVIDOR_TZ = @json($servidorZonaHoraria ?? 'America/Mexico_City');
+        const SERVIDOR_OFFSET_MS = {{ (int) ($servidorTimestampMs ?? (now()->timestamp * 1000)) }} - Date.now();
+
+        // Reloj en vivo sincronizado con la hora oficial del servidor + aviso 10 min antes del fin de turno
+        (function iniciarRelojServidor() {
+            const fmt = new Intl.DateTimeFormat('es-MX', {
+                timeZone: SERVIDOR_TZ,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            let avisoDiezMinMostrado = false;
+
+            function calcularSegundosRestantesTurno(horaTexto) {
+                if (!ESTADO_HORARIO || !ESTADO_HORARIO.hora_salida) return null;
+                const [hA, mA, sA] = horaTexto.split(':').map(n => parseInt(n, 10) || 0);
+                const [hS, mS] = String(ESTADO_HORARIO.hora_salida).split(':').map(n => parseInt(n, 10) || 0);
+                const segActual = hA * 3600 + mA * 60 + sA;
+                let segSalida = hS * 3600 + mS * 60;
+
+                if (ESTADO_HORARIO.cruza_medianoche && segActual >= 12 * 3600 && segSalida < 12 * 3600) {
+                    segSalida += 24 * 3600;
+                }
+                return segSalida - segActual;
+            }
+
+            function actualizarReloj() {
+                const ahoraSrv = new Date(Date.now() + SERVIDOR_OFFSET_MS);
+                const texto = fmt.format(ahoraSrv);
+                const el1 = document.getElementById('relojServidor');
+                const el2 = document.getElementById('relojServidorBloqueo');
+                if (el1) el1.textContent = texto;
+                if (el2) el2.textContent = texto;
+
+                // Verificar si faltan <= 10 minutos para terminar el turno
+                const rest = calcularSegundosRestantesTurno(texto);
+                const banner = document.getElementById('alertaFinTurno');
+                const lblBanner = document.getElementById('lblAlertaFinTurno');
+                const lblCuenta = document.getElementById('lblCuentaRegresivaTurno');
+
+                if (rest !== null && banner && lblBanner && lblCuenta) {
+                    if (rest > 0 && rest <= 600) {
+                        const mm = String(Math.floor(rest / 60)).padStart(2, '0');
+                        const ss = String(rest % 60).padStart(2, '0');
+                        banner.classList.remove('hidden', 'bg-rose-600', 'text-white');
+                        banner.classList.add('bg-amber-500', 'text-slate-950');
+                        lblBanner.textContent = `Atención: Tu turno (${ESTADO_HORARIO.turno_texto || ESTADO_HORARIO.hora_salida}) termina a las ${ESTADO_HORARIO.hora_salida}.`;
+                        lblCuenta.textContent = `Faltan ${mm}:${ss}`;
+
+                        if (!avisoDiezMinMostrado) {
+                            avisoDiezMinMostrado = true;
+                            if (typeof solicitarConfirmacion === 'function') {
+                                solicitarConfirmacion(
+                                    'Aviso de fin de turno',
+                                    `Faltan menos de 10 minutos para que termine tu turno (${ESTADO_HORARIO.turno_texto || ESTADO_HORARIO.hora_salida}).`,
+                                    'fa-clock',
+                                    'text-amber-500',
+                                    false
+                                );
+                            }
+                        }
+                    } else if (rest <= 0 && rest > -1800 && ESTADO_HORARIO.permitido) {
+                        banner.classList.remove('hidden', 'bg-amber-500', 'text-slate-950');
+                        banner.classList.add('bg-rose-600', 'text-white');
+                        lblBanner.textContent = `Tu turno (${ESTADO_HORARIO.hora_salida}) ya terminó. Puedes guardar este último PDF; al guardarlo se bloqueará la estación.`;
+                        lblCuenta.textContent = '00:00';
+                    }
+                }
+            }
+            actualizarReloj();
+            setInterval(actualizarReloj, 1000);
+        })();
+
+        // Bloqueo total de la interfaz de captura por horario laboral
+        window.bloquearPorHorario = function (mensaje) {
+            const overlay = document.getElementById('overlayBloqueoHorario');
+            const lblMsg = document.getElementById('lblMensajeBloqueoHorario');
+            const visor = document.getElementById('pdfViewer');
+            if (visor) visor.src = 'about:blank';
+            document.querySelectorAll('.sello-seg, #btnRenombrar, #btnInconsistencia, #btnLimpiar, #btnRotarIzquierda, #btnRotarDerecha').forEach(el => {
+                el.disabled = true;
+            });
+            if (lblMsg && mensaje) lblMsg.textContent = mensaje;
+            if (overlay) overlay.classList.remove('hidden');
+        };
 
         window.addEventListener('DOMContentLoaded', () => {
             const ultimoDirId = localStorage.getItem('val_ultimo_directorio_id');
@@ -1423,6 +1790,17 @@
                     const data = await resp.json();
                     modalInc?.classList.add('hidden');
                     if (data.ok && typeof CapturaProcesos !== 'undefined' && typeof ctx !== 'undefined') {
+                        if (data.fuera_horario_despues_de_guardar) {
+                            await ctx.solicitarConfirmacion(
+                                'Fin de horario laboral',
+                                data.aviso_horario || 'Tu turno ha finalizado. Este último registro se guardó correctamente, pero ya no podrás capturar más.',
+                                'fa-clock',
+                                'text-amber-500',
+                                false
+                            );
+                            window.bloquearPorHorario(data.aviso_horario);
+                            return;
+                        }
                         CapturaProcesos.avanzarSiguiente?.(ctx);
                     }
                 } catch (err) {
@@ -1430,9 +1808,69 @@
                 }
             });
 
+            // Si el usuario está fuera de su horario laboral (y no tiene un último PDF pendiente de guardar), bloquear de inmediato
+            if (ESTADO_HORARIO && ESTADO_HORARIO.permitido === false) {
+                window.bloquearPorHorario(ESTADO_HORARIO.mensaje);
+                return;
+            }
+
+            const iniciarCapturaAutomatica = () => {
+                lblTotalPdf.innerText = del ? `${del.nombre} - Buscando PDF...` : 'Buscando PDF libre...';
+                CapturaProcesos.cargarLoteDesdeServidor(ctx);
+            };
+
+            // Si aún no ha seleccionado número de PC en esta sesión, mostrar modal obligatorio antes de cargar PDFs
+            if (REQUIERE_SELECCION_PC) {
+                const modalPc = document.getElementById('modalSeleccionPc');
+                const selPc = document.getElementById('selectNumeroPcModal');
+                const btnPc = document.getElementById('btnConfirmarPcModal');
+                const errPc = document.getElementById('lblErrorPcModal');
+                if (modalPc && selPc && btnPc) {
+                    const ultimaPc = localStorage.getItem('val_ultima_pc_seleccionada');
+                    if (ultimaPc) selPc.value = ultimaPc;
+                    modalPc.classList.remove('hidden');
+                    selPc.focus();
+
+                    btnPc.addEventListener('click', async () => {
+                        const numeroPc = (selPc.value || '').trim();
+                        if (!numeroPc) {
+                            if (errPc) {
+                                errPc.textContent = 'Debes seleccionar un número de PC para continuar.';
+                                errPc.classList.remove('hidden');
+                            }
+                            return;
+                        }
+                        if (errPc) errPc.classList.add('hidden');
+                        btnPc.disabled = true;
+                        try {
+                            const r = await fetch("{{ route('admin.captura.seleccionarPc') }}", {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                },
+                                body: JSON.stringify({ numero_pc: numeroPc })
+                            });
+                            const d = await r.json();
+                            if (!r.ok || !d.ok) throw new Error(d.message || 'No se pudo guardar el número de PC.');
+                            localStorage.setItem('val_ultima_pc_seleccionada', numeroPc);
+                            modalPc.classList.add('hidden');
+                            iniciarCapturaAutomatica();
+                        } catch (e) {
+                            if (errPc) {
+                                errPc.textContent = e.message;
+                                errPc.classList.remove('hidden');
+                            }
+                            btnPc.disabled = false;
+                        }
+                    });
+                    return;
+                }
+            }
+
             // Iniciar búsqueda automática de PDF inmediatamente
-            lblTotalPdf.innerText = del ? `${del.nombre} - Buscando PDF...` : 'Buscando PDF libre...';
-            CapturaProcesos.cargarLoteDesdeServidor(ctx);
+            iniciarCapturaAutomatica();
         });
     </script>
 

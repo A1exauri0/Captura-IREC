@@ -398,11 +398,11 @@
 
             // COLORES POR ACCIÓN
             function getColorByAction(accion) {
-                const lower = accion.toLowerCase();
-                if (lower.includes('validado')) return 'rgb(192, 255, 192)';
-                if (lower.includes('renombrar') || lower.includes('renombrado')) return 'rgb(222, 184, 135)';
-                if (lower.includes('eliminar') || lower.includes('eliminado')) return 'rgb(255, 128, 128)';
-                return 'rgb(60, 179, 113)';
+                const lower = String(accion || '').toLowerCase();
+                if (lower.includes('valid')) return '#10b981';
+                if (lower.includes('renombr')) return '#0284c7';
+                if (lower.includes('inconsistencia') || lower.includes('recorte') || lower.includes('eliminar') || lower.includes('eliminado')) return '#ef4444';
+                return '#64748b';
             }
 
             let abortController;
@@ -920,25 +920,22 @@
 
                 const mapArchivos = {
                     'Validado': 0,
-                    'Renombrar': 0,
-                    'Eliminado': 0
+                    'Renombrar': 0
                 };
 
                 const mapImagenes = {
                     'Validado': 0,
-                    'Renombrar': 0,
-                    'Eliminado': 0
+                    'Renombrar': 0
                 };
 
                 accionesGlobal.forEach(x => {
+                    const lower = String(x.accion || '').toLowerCase();
                     let nombre = x.accion;
+                    if (lower.includes('valid')) nombre = 'Validado';
+                    else if (lower.includes('renombr')) nombre = 'Renombrar';
                     if (nombre in mapArchivos) {
                         mapArchivos[nombre] += x.total || 0;
                         mapImagenes[nombre] += x.paginas || 0;
-                    }
-                    if (nombre.toLowerCase().includes('validado') || nombre.toLowerCase().includes('renombrar')) {
-                        totalCalidad += x.total || 0;
-                        totalCalidadImagenes += x.paginas || 0;
                     }
                 });
 
@@ -956,7 +953,7 @@
                     const color = getColorByAction(accionName);
 
                     const cardHtml = `
-                        <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
+                        <div class="col-6 col-md-3 px-1 mb-3">
                             <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #ffffff, #f9fafb); border-left: 4px solid ${color} !important;">
                                 <div class="card-body p-3 d-flex flex-column justify-content-center">
                                     <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #6b7280; font-weight: 600; margin-bottom: 0.25rem;" title="${accionName} (PDFs)">${accionName} (PDFs)</p>
@@ -968,22 +965,9 @@
                     rowPdfs.insertAdjacentHTML('beforeend', cardHtml);
                 });
 
-                // Card Verde de Calidad Catastro (PDFs)
-                const calidadHtml = `
-                    <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
-                        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff;">
-                            <div class="card-body p-3 d-flex flex-column justify-content-center">
-                                <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #a7f3d0; font-weight: 600; margin-bottom: 0.25rem;">Calidad Catastro</p>
-                                <h3 class="text-2xl font-bold" style="font-size: 1.4rem; font-weight: 700; color: #ffffff; margin: 0;">${formatearNumero(totalCalidad)}</h3>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                rowPdfs.insertAdjacentHTML('beforeend', calidadHtml);
-
                 // Card Morada OCR (PDFs)
                 const ocrPdfsHtml = `
-                    <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
+                    <div class="col-6 col-md-3 px-1 mb-3">
                         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff;">
                             <div class="card-body p-3 d-flex flex-column justify-content-center">
                                 <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #ddd6fe; font-weight: 600; margin-bottom: 0.25rem;">OCR (PDFs)</p>
@@ -996,7 +980,7 @@
 
                 // Card Total General (PDFs)
                 const totalGenPdfsHtml = `
-                    <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
+                    <div class="col-6 col-md-3 px-1 mb-3">
                         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #1f2937, #111827); color: #ffffff;">
                             <div class="card-body p-3 d-flex flex-column justify-content-center">
                                 <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #9ca3af; font-weight: 600; margin-bottom: 0.25rem;">Total General (PDFs)</p>
@@ -1017,7 +1001,7 @@
                     const color = getColorByAction(accionName);
 
                     const cardHtml = `
-                        <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
+                        <div class="col-6 col-md-3 px-1 mb-3">
                             <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #ffffff, #f9fafb); border-left: 4px solid ${color} !important;">
                                 <div class="card-body p-3 d-flex flex-column justify-content-center">
                                     <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #6b7280; font-weight: 600; margin-bottom: 0.25rem;" title="${accionName} (Imágenes)">${accionName} (Imágenes)</p>
@@ -1029,22 +1013,9 @@
                     rowImagenes.insertAdjacentHTML('beforeend', cardHtml);
                 });
 
-                // Card Verde de Imágenes en Calidad
-                const calidadImagenesHtml = `
-                    <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
-                        <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #059669, #047857); color: #ffffff;">
-                            <div class="card-body p-3 d-flex flex-column justify-content-center">
-                                <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #a7f3d0; font-weight: 600; margin-bottom: 0.25rem;">Imágenes en Calidad</p>
-                                <h3 class="text-2xl font-bold" style="font-size: 1.4rem; font-weight: 700; color: #ffffff; margin: 0;">${formatearNumero(totalCalidadImagenes)}</h3>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                rowImagenes.insertAdjacentHTML('beforeend', calidadImagenesHtml);
-
                 // Card Morada OCR (Imágenes)
                 const ocrPagsHtml = `
-                    <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
+                    <div class="col-6 col-md-3 px-1 mb-3">
                         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #ffffff;">
                             <div class="card-body p-3 d-flex flex-column justify-content-center">
                                 <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #ddd6fe; font-weight: 600; margin-bottom: 0.25rem;">OCR (Imágenes)</p>
@@ -1057,7 +1028,7 @@
 
                 // Card Rosa Total General (Imágenes)
                 const totalGenPagsHtml = `
-                    <div class="col-6 col-sm-4 col-md-4 col-lg-2 px-1 mb-3">
+                    <div class="col-6 col-md-3 px-1 mb-3">
                         <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; background: linear-gradient(135deg, #db2777, #be185d); color: #ffffff;">
                             <div class="card-body p-3 d-flex flex-column justify-content-center">
                                 <p class="text-xs uppercase tracking-wider font-semibold mb-1 text-truncate" style="font-size: 0.75rem; color: #fbcfe8; font-weight: 600; margin-bottom: 0.25rem;">Total General (Imágenes)</p>

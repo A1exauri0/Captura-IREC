@@ -497,19 +497,10 @@ class AuditoriaSellosController extends Controller
                 'ac.tipo_sello as TipoSello'
             );
 
-        // Excluir Correccion renombre, movidos a inconsistencia y archivos movidos a libros de las métricas KPI y productividad de la gráfica
+        // Excluir Correccion renombre y archivos movidos a libros de las métricas KPI
         $query->where('ac.accion', '!=', 'Correccion renombre')
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
-
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
 
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {

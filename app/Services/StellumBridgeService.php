@@ -44,6 +44,37 @@ class StellumBridgeService
     }
 
     /**
+     * Solicita a Stellum un grupo de 2 o más PDFs entregables que compartan exactamente el mismo hash.
+     */
+    public function buscarGrupoMismoHash(string $tipo = 'sellos', array $excluirHashes = []): array
+    {
+        if ($this->baseUrl === '' || !preg_match('#^https?://#i', $this->baseUrl)) {
+            return ['ok' => false, 'error' => 'STELLUM_BRIDGE_URL no configurada en .env', 'items' => []];
+        }
+
+        try {
+            $params = [
+                'tipo'         => $tipo,
+                'bridge_token' => $this->token,
+            ];
+            if (!empty($excluirHashes)) {
+                $params['excluir_hashes'] = implode(',', array_slice($excluirHashes, 0, 50));
+            }
+            $response = Http::withToken($this->token)
+                ->timeout(35)
+                ->get($this->baseUrl . '/indice-pdfs/grupo-hash', $params);
+
+            if ($response->successful()) {
+                return $response->json() ?: ['ok' => false, 'items' => []];
+            }
+            return ['ok' => false, 'status' => $response->status(), 'error' => 'HTTP ' . $response->status(), 'items' => []];
+        } catch (\Throwable $e) {
+            Log::warning('StellumBridgeService::buscarGrupoMismoHash error: ' . $e->getMessage());
+            return ['ok' => false, 'error' => $e->getMessage(), 'items' => []];
+        }
+    }
+
+    /**
      * Verifica si un nombre de archivo ya existe en los entregables de indice_archivos_pdfs en Stellum.
      */
     public function verificarExistenciaEnEntregables(string $nombreArchivo, ?string $tipo = null, ?int $excluirId = null): array

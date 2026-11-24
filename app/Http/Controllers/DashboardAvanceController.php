@@ -13,6 +13,24 @@ class DashboardAvanceController extends Controller
         $usuario = Auth::user();
         abort_unless($usuario && $usuario->hasRole(['superadmin', 'administrador']), 403, 'Acceso exclusivo para Administradores y Superadministradores.');
 
+        return view('dashboard.avance_global', $this->construirDatos());
+    }
+
+    public function datos()
+    {
+        $usuario = Auth::user();
+        abort_unless($usuario && $usuario->hasRole(['superadmin', 'administrador']), 403);
+
+        return response()->json([
+            'ok' => true,
+            'actualizado_en' => now()->format('H:i:s'),
+            'datos' => $this->construirDatos(),
+        ]);
+    }
+
+    private function construirDatos(): array
+    {
+
         $metaEntregables = (int) config('metas_entregables.total_entregables', 1120130);
         $metaPaginas     = (int) config('metas_entregables.total_paginas', 22079039);
         $totalIndice     = (int) config('metas_entregables.total_indice', 1671607);
@@ -148,7 +166,7 @@ class DashboardAvanceController extends Controller
             ->limit(10)
             ->get();
 
-        return view('dashboard.avance_global', compact(
+        return compact(
             'metaEntregables',
             'metaPaginas',
             'totalIndice',
@@ -168,7 +186,7 @@ class DashboardAvanceController extends Controller
             'delegacionesAvance',
             'tendenciaDias',
             'topCapturistas'
-        ));
+        );
     }
 
     private static function normalizarNombre(string $texto): string

@@ -43,7 +43,7 @@
             },
             {
                 "id": "submenu-supervision",
-                "label": "Supervisión & Stellum",
+                "label": "Supervisión",
                 "icon": "fa-solid fa-list-check",
                 "children": [
                     { "label": "Inconsistencias", "icon": "fa-solid fa-triangle-exclamation", "route": "admin.inconsistencias.index" },
@@ -115,6 +115,12 @@
                 "icon": "fa-solid fa-user-tag",
                 "route": "admin.asignaciones.index",
                 "active_routes": ["admin.asignaciones.*"]
+            },
+            {
+                "label": "Números de PC",
+                "icon": "fa-solid fa-computer",
+                "route": "admin.pcs.index",
+                "active_routes": ["admin.pcs.*"]
             },
             {
                 "label": "Inventario de Equipos",

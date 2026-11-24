@@ -299,13 +299,11 @@
 
             // COLORES POR ACCIÓN
             function getColorByAction(accion) {
-                const lower = accion.toLowerCase();
-                if (lower.includes('validado')) return 'rgb(192, 255, 192)';
-                if (lower.includes('renombrar') || lower.includes('renombrado')) return 'rgb(222, 184, 135)';
-                if (lower.includes('eliminar') || lower.includes('eliminado')) return 'rgb(255, 128, 128)';
-                if (lower.includes('inconsistencia')) return 'rgb(255, 255, 192)';
-                if (lower.includes('duplicar') || lower.includes('duplicado')) return 'rgb(192, 235, 255)';
-                return 'rgb(60, 179, 113)';
+                const lower = String(accion || '').toLowerCase();
+                if (lower.includes('valid')) return '#10b981';
+                if (lower.includes('renombr')) return '#0284c7';
+                if (lower.includes('inconsistencia') || lower.includes('recorte') || lower.includes('eliminar') || lower.includes('eliminado')) return '#ef4444';
+                return '#64748b';
             }
 
             function renderTurnoCards(dataTurnos) {
