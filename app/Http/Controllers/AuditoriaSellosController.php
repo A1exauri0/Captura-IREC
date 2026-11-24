@@ -4587,7 +4587,169 @@ class AuditoriaSellosController extends Controller
         $fecha_inicio = $request->fecha_inicio;
         $fecha_fin = $request->fecha_fin;
         $tipo_archivo = strtolower(trim((string) $request->tipo_archivo));
+        $estado_trabajo = strtolower(trim((string) ($request->estado_trabajo ?: 'trabajados')));
 
+        // -----------------------------------------------------------------
+        // MODO 1: En captura activa (archivos_sesiones estado = en_captura)
+        // -----------------------------------------------------------------
+        if ($estado_trabajo === 'en_captura') {
+            $q = \App\Models\ArchivoSesion::with(['usuario', 'delegacion'])
+                ->where('estado', 'en_captura');
+
+            if (!empty($delegacion_id)) {
+                $q->where('delegacion_id', $delegacion_id);
+            }
+            if (!empty($tipo_archivo)) {
+                $q->where('tipo_archivo', $tipo_archivo);
+            }
+            if (!empty($busqueda)) {
+                $q->where(function ($sub) use ($busqueda) {
+                    $sub->where('archivo_nombre', 'like', "%{$busqueda}%")
+                        ->orWhere('ruta_origen', 'like', "%{$busqueda}%")
+                        ->orWhere('hash_pdf', 'like', "%{$busqueda}%");
+                });
+            }
+
+            $registros = $q->orderByDesc('tomado_en')->limit(300)->get()->map(function ($s) {
+                return (object) [
+                    'id'                => $s->id,
+                    'tipo_documento'    => strtoupper($s->tipo_archivo ?: 'SELLOS'),
+                    'fecha_hora'        => $s->tomado_en ? $s->tomado_en->format('Y-m-d H:i:s') : null,
+                    'created_at'        => $s->created_at?->format('Y-m-d H:i:s'),
+                    'accion'            => 'en_captura',
+                    'estado_trabajo'    => 'en_captura',
+                    'archivo_original'  => $s->archivo_nombre,
+                    'archivo_nuevo'     => '-',
+                    'lote'              => basename(dirname(str_replace('\\', '/', (string) $s->ruta_origen))),
+                    'pc'                => $s->pc,
+                    'paginas'           => (int) $s->paginas,
+                    'ruta_origen'       => $s->ruta_origen,
+                    'ruta_propuesta'    => null,
+                    'ruta_destino'      => null,
+                    'hash'              => $s->hash_pdf,
+                    'archivo_danado'    => false,
+                    'usuario_nombre'    => $s->usuario->name ?? 'Sin Usuario',
+                    'delegacion_nombre' => $s->delegacion->nombre ?? 'Sin Delegación',
+                ];
+            });
+
+            return response()->json([
+                'registros' => $registros,
+                'kpis'      => ['total' => $registros->count(), 'renombrados' => 0, 'validados' => 0, 'duplicados' => 0],
+            ]);
+        }
+
+        // -----------------------------------------------------------------
+        // MODO 2: Pendientes o Todos (cruza indice_archivos_pdfs de Stellum vs BD local)
+        // -----------------------------------------------------------------
+        if (in_array($estado_trabajo, ['pendientes', 'todos'], true)) {
+            $delFiltro = $delegacion_id ? DB::table('delegaciones')->where('id', $delegacion_id)->first() : null;
+            $bridge = app(\App\Services\StellumBridgeService::class);
+            $tipoConsulta = $tipo_archivo ?: 'sellos';
+
+            $itemsStellum = [];
+            $afterId = 0;
+            $maxPaginas = 4; // hasta 400 registros rápidos desde Stellum
+            for ($p = 0; $p < $maxPaginas; $p++) {
+                $resp = $bridge->listarIndice([
+                    'tipo'          => $tipoConsulta,
+                    'clasificacion' => 'entregable',
+                    'delegacion'    => $delFiltro?->nombre,
+                    'q'             => $busqueda,
+                    'after_id'      => $afterId,
+                    'limit'         => 100,
+                ]);
+                if (empty($resp['ok']) || empty($resp['items'])) {
+                    break;
+                }
+                foreach ($resp['items'] as $it) {
+                    $itemsStellum[] = $it;
+                }
+                if (empty($resp['has_more']) || count($itemsStellum) >= 250) {
+                    break;
+                }
+                $afterId = (int) ($resp['last_id'] ?? $afterId);
+            }
+
+            $idsIndice = collect($itemsStellum)->pluck('id')->filter()->values()->all();
+
+            $auditoriasPorIndice = !empty($idsIndice)
+                ? DB::table('auditoria_sellos as a')
+                    ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
+                    ->whereIn('a.indice_pdf_id', $idsIndice)
+                    ->select('a.*', 'u.name as usuario_nombre')
+                    ->orderByDesc('a.id')
+                    ->get()
+                    ->keyBy('indice_pdf_id')
+                : collect();
+
+            $sesionesPorIndice = !empty($idsIndice)
+                ? DB::table('archivos_sesiones as s')
+                    ->leftJoin('users as u', 'u.id', '=', 's.user_id')
+                    ->whereIn('s.indice_pdf_id', $idsIndice)
+                    ->select('s.*', 'u.name as usuario_nombre')
+                    ->get()
+                    ->keyBy('indice_pdf_id')
+                : collect();
+
+            $registros = collect();
+            foreach ($itemsStellum as $it) {
+                $idPdf = (int) ($it['id'] ?? 0);
+                $aud = $auditoriasPorIndice->get($idPdf);
+                $ses = $sesionesPorIndice->get($idPdf);
+
+                $estadoItem = 'pendiente';
+                if ($aud) {
+                    $estadoItem = 'trabajado';
+                } elseif ($ses && $ses->estado === 'en_captura') {
+                    $estadoItem = 'en_captura';
+                } elseif ($ses && $ses->estado === 'completado') {
+                    $estadoItem = 'trabajado';
+                }
+
+                if ($estado_trabajo === 'pendientes' && $estadoItem !== 'pendiente') {
+                    continue;
+                }
+
+                $rutaOrg = (string) ($it['ruta'] ?? '');
+                $loteCarpeta = $rutaOrg !== '' ? basename(dirname(str_replace('\\', '/', $rutaOrg))) : 'N/A';
+
+                $registros->push((object) [
+                    'id'                => $idPdf,
+                    'tipo_documento'    => strtoupper((string) ($it['tipo'] ?? $tipoConsulta)),
+                    'fecha_hora'        => $aud->fecha_hora ?? ($ses->tomado_en ?? null),
+                    'created_at'        => $aud->created_at ?? null,
+                    'accion'            => $aud ? $aud->accion : ($estadoItem === 'en_captura' ? 'en_captura' : 'pendiente'),
+                    'estado_trabajo'    => $estadoItem,
+                    'archivo_original'  => preg_replace('/\.pdf$/i', '', (string) ($it['nombre'] ?? '')),
+                    'archivo_nuevo'     => $aud->archivo_nuevo ?? '-',
+                    'lote'              => $loteCarpeta,
+                    'pc'                => $aud->pc ?? ($ses->pc ?? '-'),
+                    'paginas'           => (int) ($it['paginas'] ?? 0),
+                    'ruta_origen'       => $rutaOrg,
+                    'ruta_propuesta'    => $aud->ruta_propuesta ?? null,
+                    'ruta_destino'      => $aud->ruta_destino ?? null,
+                    'hash'              => $it['hash'] ?? null,
+                    'archivo_danado'    => (bool) ($aud->archivo_danado ?? false),
+                    'usuario_nombre'    => $aud->usuario_nombre ?? ($ses->usuario_nombre ?? 'Sin asignar'),
+                    'delegacion_nombre' => $it['delegacion'] ?? 'Sin Delegación',
+                ]);
+            }
+
+            return response()->json([
+                'registros' => $registros->values(),
+                'kpis'      => [
+                    'total'       => $registros->count(),
+                    'renombrados' => $registros->filter(fn ($i) => in_array(strtolower((string) $i->accion), ['renombrar', 'renombrado']))->count(),
+                    'validados'   => $registros->filter(fn ($i) => in_array(strtolower((string) $i->accion), ['validado', 'validar']))->count(),
+                    'duplicados'  => 0,
+                ],
+            ]);
+        }
+
+        // -----------------------------------------------------------------
+        // MODO 3 (Default): Trabajados (tablas locales auditoria_*)
+        // -----------------------------------------------------------------
         $limitePorTabla = !empty($busqueda) ? 500 : 150;
         $resultados = collect();
 
@@ -4621,12 +4783,14 @@ class AuditoriaSellosController extends Controller
                 'ac.fecha_hora',
                 'ac.created_at',
                 'ac.accion',
+                DB::raw("'trabajado' as estado_trabajo"),
                 'ac.archivo_original',
                 'ac.archivo_nuevo',
                 DB::raw("ac.{$colLote} as lote"),
                 'ac.pc',
                 'ac.paginas',
                 'ac.ruta_origen',
+                'ac.ruta_propuesta',
                 'ac.ruta_destino',
                 'ac.hash',
                 'ac.archivo_danado',
@@ -4692,108 +4856,85 @@ class AuditoriaSellosController extends Controller
     }
 
     /**
-     * Obtiene la lista de lotes unificados en la tabla lotes_captura (Registros, Sellos, Catastro y Notarías)
+     * Obtiene la lista de sesiones por archivo individual (archivos_sesiones).
      */
     public function obtener_lotes_trabajando(Request $request)
     {
         $estado = $request->estado;
         $delegacion_id = $request->delegacion_id;
         $user_id = $request->user_id;
-        $origen = $request->origen; // 'captura', 'catastro', 'notaria', '' (todos)
 
-        $queryCaptura = \App\Models\LoteCaptura::with(['usuario', 'delegacion']);
+        // Liberar automáticamente sesiones expiradas (> 15 min)
+        \App\Models\ArchivoSesion::where('estado', 'en_captura')
+            ->whereNotNull('expira_en')
+            ->where('expira_en', '<', now())
+            ->delete();
+
+        $query = \App\Models\ArchivoSesion::with(['usuario', 'delegacion']);
 
         if (!empty($estado)) {
-            $queryCaptura->where('estado', $estado);
+            $estadoMapeado = $estado === 'en_proceso' ? 'en_captura' : $estado;
+            $query->where('estado', $estadoMapeado);
         }
-
         if (!empty($delegacion_id)) {
-            $queryCaptura->where('delegacion_id', $delegacion_id);
+            $query->where('delegacion_id', $delegacion_id);
         }
-
         if (!empty($user_id)) {
-            $queryCaptura->where('user_id', $user_id);
+            $query->where('user_id', $user_id);
         }
 
-        $lotesCaptura = $queryCaptura->get();
+        $sesiones = $query->orderByDesc('updated_at')->limit(300)->get();
 
-        $todosLotes = $lotesCaptura->map(function ($lote) use ($origen) {
-            $esNotaria = ($lote->tipo_archivo === 'notarias' || !empty($lote->notaria_nombre) || strtoupper((string) $lote->disco) === 'NOTARÍAS');
-            $esCatastro = !$esNotaria && ($lote->tipo_archivo === 'catastro' || strtolower((string) $lote->disco) === 'ssdcats' || (int) $lote->delegacion_id === 500 || str_contains(strtoupper((string) $lote->ruta_relativa), 'CATASTRO'));
-
-            if ($origen === 'notaria' && !$esNotaria) {
-                return null;
-            }
-            if ($origen === 'catastro' && !$esCatastro) {
-                return null;
-            }
-            if ($origen === 'captura' && ($esCatastro || $esNotaria)) {
-                return null;
-            }
-
-            $nombreDelegacion = $esNotaria
-                ? ($lote->notaria_nombre ?: 'Notaría')
-                : ($lote->delegacion ? $lote->delegacion->nombre : 'Sin Delegación');
-
-            if ($esCatastro && ($nombreDelegacion === 'Sin Delegación' || $nombreDelegacion === 'TUXTLA GUTIÉRREZ' || empty($nombreDelegacion))) {
-                $nombreDelegacion = 'CATASTRO';
-            }
-
+        $todosLotes = $sesiones->map(function ($s) {
             return [
-                'id' => $lote->id,
-                'tipo_origen' => $esNotaria ? 'notaria' : ($esCatastro ? 'catastro' : 'captura'),
-                'disco' => $lote->disco ?: 'N/A',
-                'es_catastro' => $esCatastro,
-                'es_notaria' => $esNotaria,
-                'nombre_lote' => $esNotaria ? ($lote->volumen ?: $lote->nombre_lote) : $lote->nombre_lote,
-                'ruta_relativa' => $lote->ruta_relativa,
-                'estado' => $lote->estado,
-                'delegacion' => $nombreDelegacion,
-                'delegacion_id' => $lote->delegacion_id,
-                'usuario' => $lote->usuario ? ($lote->usuario->name ?: $lote->usuario->user) : 'Sin Usuario (ID: ' . $lote->user_id . ')',
-                'user_id' => $lote->user_id,
-                'tomado_en' => $lote->tomado_en ? $lote->tomado_en->format('Y-m-d H:i:s') : ($lote->created_at ? $lote->created_at->format('Y-m-d H:i:s') : '-'),
-                'completado_en' => $lote->completado_en ? $lote->completado_en->format('Y-m-d H:i:s') : '-',
-                'progreso_archivo' => $lote->progreso_archivo ?: ($lote->pc ? 'PC: ' . $lote->pc : '-'),
-                'updated_at' => $lote->updated_at ? $lote->updated_at->format('Y-m-d H:i:s') : '-',
-                'raw_time' => $lote->updated_at ? $lote->updated_at->timestamp : ($lote->tomado_en ? $lote->tomado_en->timestamp : ($lote->created_at ? $lote->created_at->timestamp : 0)),
+                'id'               => $s->id,
+                'tipo_origen'      => $s->tipo_archivo ?: 'sellos',
+                'disco'            => $s->disco ?: 'sellos',
+                'es_catastro'      => $s->tipo_archivo === 'catastro',
+                'es_notaria'       => $s->tipo_archivo === 'notarias',
+                'nombre_lote'      => $s->archivo_nombre,
+                'ruta_relativa'    => $s->archivo_nombre,
+                'estado'           => $s->estado === 'en_captura' ? 'en_proceso' : $s->estado,
+                'delegacion'       => $s->delegacion ? $s->delegacion->nombre : 'Sin Delegación',
+                'delegacion_id'    => $s->delegacion_id,
+                'usuario'          => $s->usuario ? ($s->usuario->name ?: $s->usuario->user) : ('Usuario #' . $s->user_id),
+                'user_id'          => $s->user_id,
+                'tomado_en'        => $s->tomado_en ? $s->tomado_en->format('Y-m-d H:i:s') : '-',
+                'completado_en'    => $s->completado_en ? $s->completado_en->format('Y-m-d H:i:s') : '-',
+                'progreso_archivo' => $s->tiempo_segundos ? ($s->tiempo_segundos . ' seg') : ($s->pc ? 'PC: ' . $s->pc : 'En captura'),
+                'updated_at'       => $s->updated_at ? $s->updated_at->format('Y-m-d H:i:s') : '-',
+                'raw_time'         => $s->updated_at ? $s->updated_at->timestamp : 0,
             ];
-        })->filter()->sortByDesc('raw_time')->values();
-
-        $totalLotes = $todosLotes->count();
-        $enProceso = $todosLotes->where('estado', 'en_proceso')->count();
-        $completados = $todosLotes->where('estado', 'completado')->count();
-        $usuariosActivos = $todosLotes->pluck('user_id')->unique()->filter()->count();
+        })->values();
 
         return response()->json([
             'lotes' => $todosLotes,
-            'kpis' => [
-                'total' => $totalLotes,
-                'en_proceso' => $enProceso,
-                'completados' => $completados,
-                'usuarios_activos' => $usuariosActivos,
+            'kpis'  => [
+                'total'            => $todosLotes->count(),
+                'en_proceso'       => $todosLotes->where('estado', 'en_proceso')->count(),
+                'completados'      => $todosLotes->where('estado', 'completado')->count(),
+                'usuarios_activos' => $todosLotes->where('estado', 'en_proceso')->pluck('user_id')->unique()->filter()->count(),
             ]
         ]);
     }
 
     /**
-     * Elimina un registro de lote en lotes_captura para liberarlo
+     * Libera una sesión de archivo individual en archivos_sesiones.
      */
     public function eliminar_lote_trabajando(Request $request)
     {
         $id = $request->id;
-        $lote = \App\Models\LoteCaptura::find($id);
+        $sesion = \App\Models\ArchivoSesion::find($id);
 
-        if (!$lote) {
-            self::logSellos('warning', 'Intento de eliminar lote trabajando no encontrado', ['id' => $id]);
+        if (!$sesion) {
             return response()->json([
-                'exito' => false,
-                'mensaje' => 'El registro de la sesión/lote no fue encontrado o ya había sido eliminado.'
+                'exito'   => false,
+                'mensaje' => 'La sesión del archivo no fue encontrada o ya fue liberada.'
             ], 404);
         }
 
-        $nombreLote = $lote->volumen ?: $lote->nombre_lote;
-        $lote->delete();
+        $nombreLote = $sesion->archivo_nombre;
+        $sesion->delete();
 
         try {
             broadcast(new \App\Events\LoteActualizadoEvent('lote_eliminado', ['id' => $id, 'lote' => $nombreLote]));

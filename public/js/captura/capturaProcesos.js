@@ -93,48 +93,65 @@ const CapturaProcesos = (() => {
         const pdf = ctx.listaPdfs[ctx.indiceActual];
         const url = CapturaArchivos.urlVerPdf(ctx.dirSeleccionado.id, pdf.ruta);
 
+        console.log('[Captura-IREC] Registro PDF obtenido para captura:', {
+            sesion_id: pdf.sesion_id || ctx.loteActualId || null,
+            indice_pdf_id: pdf.indice_pdf_id || null,
+            nombre_archivo: pdf.nombre || null,
+            ruta_origen: pdf.ruta_origen || pdf.ruta || null,
+            paginas: pdf.paginas || null,
+            hash: pdf.hash || null,
+            tipo: pdf.tipo || 'sellos',
+            clasificacion: pdf.clasificacion || null,
+            delegacion: ctx.delSeleccionada || null,
+        });
+
         mostrarCargando("Cargando PDF...");
 
-        // Verificar si el archivo está accesible antes de cargarlo en el visor
-        fetch(url)
-            .then(response => {
+        // Descargar el PDF una sola vez como Blob y mostrarlo en el iframe (evita doble descarga de archivos grandes)
+        fetch(url, { credentials: 'same-origin' })
+            .then(async response => {
                 if (!response.ok) {
-                    throw new Error("El archivo no se encuentra o no es accesible.");
+                    const txt = await response.text().catch(() => '');
+                    throw new Error(`HTTP ${response.status}: ${txt || 'El archivo no se encuentra o no es accesible.'}`);
                 }
+                return response.blob();
+            })
+            .then(blob => {
                 const visor = document.getElementById("pdfViewer");
-                visor.src = "about:blank";
+                if (visor.dataset.blobUrl) {
+                    URL.revokeObjectURL(visor.dataset.blobUrl);
+                }
+                const blobUrl = URL.createObjectURL(blob);
+                visor.dataset.blobUrl = blobUrl;
                 visor.style.transform = "none";
                 visor.dataset.rotation = "0";
 
                 visor.onload = function () {
-                    if (visor.src !== "about:blank" && visor.src !== "") {
-                        ocultarCargando();
-                        visor.onload = null;
-                    }
+                    ocultarCargando();
+                    visor.onload = null;
                 };
-
-                setTimeout(() => {
-                    visor.src = url + "&t=" + Date.now();
-                }, 50);
+                visor.src = blobUrl;
+                // Fallback por si el visor PDF del navegador no dispara onload en blob:
+                setTimeout(() => ocultarCargando(), 800);
 
                 reiniciarCaptura(ctx);
                 ctx.historialCapturas.push(pdf.nombre.replace(/-/g, "_"));
             })
             .catch(async err => {
                 ocultarCargando();
-                console.error("No se pudo cargar el PDF:", err);
+                console.error("[Captura-IREC] No se pudo cargar el PDF:", err);
 
                 // Mostrar modal de confirmación si no se detecta el archivo
                 const pasarSiguiente = await ctx.solicitarConfirmacion(
                     "Archivo no encontrado",
-                    `No se pudo leer o encontrar el archivo '${pdf.nombre}.pdf'. ¿Desea pasar al siguiente?`,
+                    `No se pudo leer o encontrar el documento actual (${err.message}). ¿Desea pasar al siguiente?`,
                     "fa-triangle-exclamation",
                     "text-red-500"
                 );
                 if (pasarSiguiente) {
                     avanzarSiguiente(ctx);
                 } else {
-                    ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">Error: El archivo no existe en el servidor.</span>`;
+                    ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message}</span>`;
                 }
             });
     }
@@ -202,8 +219,10 @@ const CapturaProcesos = (() => {
                 ? "Ejemplo: 01_2024_123456 (Folio de 1 a 6 dígitos)"
                 : "Ejemplo: 01_01_01_01_00_00_2011_0090_00";
 
-            document.getElementById("btnRenombrar").disabled = true;
-            document.getElementById("btnDuplicar").disabled = true;
+            const btnRen0 = document.getElementById("btnRenombrar");
+            const btnDup0 = document.getElementById("btnDuplicar");
+            if (btnRen0) btnRen0.disabled = true;
+            if (btnDup0) btnDup0.disabled = true;
             return false;
         }
 
@@ -230,8 +249,10 @@ const CapturaProcesos = (() => {
                         "border-red-500",
                     );
                     ctx.txtNombre.classList.add("border-amber-500");
-                    document.getElementById("btnRenombrar").disabled = true;
-                    document.getElementById("btnDuplicar").disabled = true;
+                    const btnRen1 = document.getElementById("btnRenombrar");
+                    const btnDup1 = document.getElementById("btnDuplicar");
+                    if (btnRen1) btnRen1.disabled = true;
+                    if (btnDup1) btnDup1.disabled = true;
                     return false;
                 } else {
                     ctx.lblEstado.innerHTML = `<span class="text-green-600 dark:text-green-400 font-bold">La confirmación coincide ✅</span>`;
@@ -254,15 +275,17 @@ const CapturaProcesos = (() => {
                 );
             }
 
+            const btnRenOk = document.getElementById("btnRenombrar");
+            const btnDupOk = document.getElementById("btnDuplicar");
             if (ctx.accionEnEspera === "Renombrar") {
-                document.getElementById("btnRenombrar").disabled = false;
-                document.getElementById("btnDuplicar").disabled = true;
+                if (btnRenOk) btnRenOk.disabled = false;
+                if (btnDupOk) btnDupOk.disabled = true;
             } else if (ctx.accionEnEspera === "Duplicar") {
-                document.getElementById("btnRenombrar").disabled = true;
-                document.getElementById("btnDuplicar").disabled = false;
+                if (btnRenOk) btnRenOk.disabled = true;
+                if (btnDupOk) btnDupOk.disabled = false;
             } else {
-                document.getElementById("btnRenombrar").disabled = false;
-                document.getElementById("btnDuplicar").disabled = false;
+                if (btnRenOk) btnRenOk.disabled = false;
+                if (btnDupOk) btnDupOk.disabled = false;
             }
             return true;
         } else {
@@ -272,8 +295,10 @@ const CapturaProcesos = (() => {
                 "border-amber-500",
             );
             ctx.txtNombre.classList.add("border-red-500");
-            document.getElementById("btnRenombrar").disabled = true;
-            document.getElementById("btnDuplicar").disabled = true;
+            const btnRenErr = document.getElementById("btnRenombrar");
+            const btnDupErr = document.getElementById("btnDuplicar");
+            if (btnRenErr) btnRenErr.disabled = true;
+            if (btnDupErr) btnDupErr.disabled = true;
             return false;
         }
     }
@@ -290,20 +315,22 @@ const CapturaProcesos = (() => {
         const delegacionId = ctx.delSeleccionada ? ctx.delSeleccionada.id : null;
         const nombreDel = ctx.delSeleccionada ? ctx.delSeleccionada.nombre : "Búsqueda Automática";
 
-        ctx.lblTotalPdf.innerText = `${nombreDel} - Buscando lote...`;
-        ctx.lblEstado.innerHTML = '<span class="text-blue-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Buscando lote libre...</span>';
-        mostrarCargando("Buscando lote libre...");
+        ctx.lblTotalPdf.innerText = `${nombreDel} - Buscando PDF...`;
+        ctx.lblEstado.innerHTML = '<span class="text-blue-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Buscando PDF libre...</span>';
+        mostrarCargando("Buscando PDF libre...");
 
         try {
-            const resp = await CapturaArchivos.buscarLote(
+            const resp = await CapturaArchivos.buscarPdf(
                 ctx.dirSeleccionado.id,
                 delegacionId,
             );
+            console.log('[Captura-IREC] Respuesta /captura/buscar-pdf:', resp);
             if (!resp.ok) {
+                ocultarCargando();
                 ctx.lblTotalPdf.innerText =
-                    resp.mensaje || "Sin lotes disponibles";
+                    resp.mensaje || "Sin archivos PDF disponibles";
                 ctx.lblEstado.innerHTML =
-                    '<span class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> No hay más lotes</span>';
+                    `<span class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${resp.mensaje || 'No hay más PDFs'}</span>`;
                 document.getElementById("pdfViewer").src = "about:blank";
                 return;
             }
@@ -322,14 +349,14 @@ const CapturaProcesos = (() => {
             ctx.indiceActual = 0;
 
             const nombreDelFinal = ctx.delSeleccionada ? ctx.delSeleccionada.nombre : 'Delegación';
-            ctx.lblTotalPdf.innerText = `${nombreDelFinal} - ${ctx.loteActualNombre}`;
+            ctx.lblTotalPdf.innerText = `${nombreDelFinal}`;
             reiniciarCaptura(ctx);
             cargarPdfActual(ctx);
         } catch (err) {
-            ctx.lblTotalPdf.innerText = "Error al buscar lote";
-            ctx.lblEstado.innerHTML = `<span class="text-red-500">${err.message}</span>`;
-        } finally {
             ocultarCargando();
+            console.error('[Captura-IREC] Error en cargarLoteDesdeServidor:', err);
+            ctx.lblTotalPdf.innerText = "Error al buscar PDF";
+            ctx.lblEstado.innerHTML = `<span class="text-red-500">${err.message}</span>`;
         }
     }
 
@@ -345,37 +372,35 @@ const CapturaProcesos = (() => {
 
         if (!validarInput(ctx)) return;
 
+        // Metadatos reales del registro de Stellum (indice_archivos_pdfs) para guardar en auditoria_sellos
+        const metaPdf = {
+            sesion_id: pdf.sesion_id || ctx.loteActualId || null,
+            indice_pdf_id: pdf.indice_pdf_id || null,
+            ruta_origen: pdf.ruta_origen || '',
+            archivo_original: pdf.nombre || '',
+            paginas: pdf.paginas || 1,
+            hash: pdf.hash || null,
+            tipo_documento: pdf.tipo || 'sellos',
+            delegacion_id: ctx.delSeleccionada ? ctx.delSeleccionada.id : null,
+        };
+
         // Caso A: Coincide exactamente con el nombre original en disco (ya tiene formato correcto con guiones bajos)
         if (capturado.toLowerCase() === pdf.nombre.toLowerCase()) {
-            const rutaArchivoOriginal = pdf.ruta;
-            const nombreArchivoOriginal = pdf.nombre;
+            const rutaArchivoOriginal = pdf.ruta_origen || pdf.ruta;
 
             // Avanzar inmediatamente en la interfaz
             avanzarSiguiente(ctx);
             ctx.lblEstado.innerHTML =
                 '<span class="text-green-600 dark:text-green-400 font-bold">Validando... ✅</span>';
 
-            // Ejecutar en segundo plano
+            // Ejecutar en segundo plano (registra en auditoria_sellos y cierra archivos_sesiones)
             CapturaArchivos.validar(
                 ctx.dirSeleccionado.id,
                 rutaArchivoOriginal,
-                ctx.delSeleccionada.id,
+                ctx.delSeleccionada ? ctx.delSeleccionada.id : null,
                 ctx.loteActualNombre,
+                { ...metaPdf, detalles: 'Validado en primera captura' },
             )
-                .then((resp) => {
-                    if (resp.ok) {
-                        CapturaAuditoria.registrar({
-                            accion: "Validado",
-                            disco: ctx.dirSeleccionado.id,
-                            delegacion_id: ctx.delSeleccionada.id,
-                            nombre_lote: ctx.loteActualNombre,
-                            archivo_original: nombreArchivoOriginal + ".pdf",
-                            archivo_nuevo: nombreArchivoOriginal + ".pdf",
-                            detalles: "Validado en primera captura",
-                            paginas: resp.paginas || 0,
-                        });
-                    }
-                })
                 .catch((err) => {
                     console.error("Error al validar: " + err.message);
                 });
@@ -394,8 +419,12 @@ const CapturaProcesos = (() => {
             }
             ctx.lblEstado.innerText = "Confirme el nuevo nombre.";
             ctx.txtNombre.value = "";
-            ctx.txtNombre.focus();
-            document.getElementById("btnDuplicar").disabled = true;
+            document.querySelectorAll('.sello-seg').forEach(el => { el.value = ''; });
+            const primero = document.getElementById('selloDel');
+            if (primero) primero.focus();
+            else ctx.txtNombre.focus();
+            const btnDup = document.getElementById("btnDuplicar");
+            if (btnDup) btnDup.disabled = true;
             return;
         }
 
@@ -405,125 +434,50 @@ const CapturaProcesos = (() => {
         ) {
             const primerCaptura = ctx.historialCapturas[1];
             if (capturado.toLowerCase() === primerCaptura.toLowerCase()) {
-                const rutaOriginal = pdf.ruta;
-                const nombreOriginal = pdf.nombre;
+                const rutaOriginal = pdf.ruta_origen || pdf.ruta;
                 const nuevoNombre = capturado;
 
                 ctx.lblEstado.innerHTML = '<span class="text-blue-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando...</span>';
                 const validado = await ctx.solicitarConfirmacion(
-                    "Validación",
-                    "¿El documento ha sido validado correctamente?",
+                    "Confirmar captura",
+                    "¿Confirmas guardar el nuevo nombre propuesto en base de datos?",
                     "fa-circle-check",
                     "text-green-500",
                 );
 
-                if (validado) {
-                    const btnRen = document.getElementById("btnRenombrar");
-                    if (btnRen) {
-                        btnRen.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Renombrando...';
-                        btnRen.disabled = true;
-                    }
-                    mostrarCargando("Renombrando y validando...");
-                    ctx.lblEstado.innerHTML =
-                        '<span class="text-green-600 dark:text-green-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Renombrando y validando...</span>';
+                if (!validado) return;
 
-                    CapturaArchivos.renombrar(
-                        ctx.dirSeleccionado.id,
-                        rutaOriginal,
-                        nuevoNombre,
-                    )
-                        .then((respRen) => {
-                            if (respRen.ok) {
-                                return CapturaArchivos.validar(
-                                    ctx.dirSeleccionado.id,
-                                    respRen.ruta_nueva,
-                                    ctx.delSeleccionada.id,
-                                    ctx.loteActualNombre,
-                                ).then((respVal) => {
-                                    if (respVal.ok) {
-                                        CapturaAuditoria.registrar({
-                                            accion: "Renombrar",
-                                            disco: ctx.dirSeleccionado.id,
-                                            delegacion_id:
-                                                ctx.delSeleccionada.id,
-                                            nombre_lote: ctx.loteActualNombre,
-                                            archivo_original:
-                                                nombreOriginal + ".pdf",
-                                            archivo_nuevo: nuevoNombre + ".pdf",
-                                            detalles: "Validado",
-                                            paginas:
-                                                respVal.paginas ||
-                                                respRen.paginas ||
-                                                0,
-                                        });
-                                    }
-                                });
-                            }
-                        })
-                        .then(() => {
-                            avanzarSiguiente(ctx);
-                        })
-                        .catch((err) => {
-                            console.error(
-                                "Error en renombrar/validar: " + err.message,
-                            );
-                            ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message}</span>`;
-                        })
-                        .finally(() => {
-                            ocultarCargando();
-                            if (btnRen) {
-                                btnRen.innerHTML = "Renombrar";
-                            }
-                        });
-                } else {
-                    const btnRen = document.getElementById("btnRenombrar");
-                    if (btnRen) {
-                        btnRen.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Renombrando...';
-                        btnRen.disabled = true;
-                    }
-                    mostrarCargando("Renombrando...");
-                    ctx.lblEstado.innerHTML =
-                        '<span class="text-green-600 dark:text-green-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Renombrando...</span>';
-
-                    CapturaArchivos.renombrar(
-                        ctx.dirSeleccionado.id,
-                        rutaOriginal,
-                        nuevoNombre,
-                    )
-                        .then((respRen) => {
-                            if (respRen.ok) {
-                                CapturaAuditoria.registrar({
-                                    accion: "Renombrar",
-                                    disco: ctx.dirSeleccionado.id,
-                                    delegacion_id: ctx.delSeleccionada.id,
-                                    nombre_lote: ctx.loteActualNombre,
-                                    archivo_original: nombreOriginal + ".pdf",
-                                    archivo_nuevo: nuevoNombre + ".pdf",
-                                    detalles: "Solo renombrado",
-                                    paginas: respRen.paginas || 0,
-                                });
-
-                                // Modificar datos locales
-                                pdf.nombre = nuevoNombre;
-                                pdf.ruta = respRen.ruta_nueva || (rutaOriginal.substring(0, rutaOriginal.lastIndexOf("/")) + "/" + nuevoNombre + ".pdf");
-                                ctx.pdfFueRenombrado = true;
-                            }
-                        })
-                        .then(() => {
-                            reiniciarCaptura(ctx);
-                            cargarPdfActual(ctx);
-                        })
-                        .catch((err) => {
-                            console.error("Error al renombrar: " + err.message);
-                            ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message}</span>`;
-                        })
-                        .finally(() => {
-                            ocultarCargando();
-                            if (btnRen) {
-                                btnRen.innerHTML = "Renombrar";
-                            }
-                        });
+                const btnRen = document.getElementById("btnRenombrar");
+                if (btnRen) {
+                    btnRen.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Guardando...';
+                    btnRen.disabled = true;
                 }
+                mostrarCargando("Guardando captura...");
+                ctx.lblEstado.innerHTML =
+                    '<span class="text-green-600 dark:text-green-400 font-bold"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Guardando...</span>';
+
+                CapturaArchivos.renombrar(
+                    ctx.dirSeleccionado.id,
+                    rutaOriginal,
+                    nuevoNombre,
+                    { ...metaPdf, detalles: 'Renombrado y validado en doble captura' },
+                )
+                    .then((respRen) => {
+                        if (respRen.ok) {
+                            avanzarSiguiente(ctx);
+                        }
+                    })
+                    .catch((err) => {
+                        console.error("Error en renombrar: " + err.message);
+                        ctx.lblEstado.innerHTML = `<span class="text-red-500 font-bold">Error: ${err.message}</span>`;
+                    })
+                    .finally(() => {
+                        ocultarCargando();
+                        if (btnRen) {
+                            btnRen.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Renombrar';
+                        }
+                    });
+                return;
             } else {
                 await ctx.solicitarConfirmacion(
                     "Error de Coincidencia",

@@ -4,36 +4,37 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class LoteCaptura extends Model
+class ArchivoSesion extends Model
 {
-    protected $table = 'lotes_captura';
+    protected $table = 'archivos_sesiones';
 
     protected $fillable = [
+        'user_id',
+        'indice_pdf_id',
         'disco',
         'tipo_archivo',
         'delegacion_id',
-        'notaria_nombre',
-        'volumen',
         'pc',
-        'nombre_lote',
-        'ruta_relativa',
+        'archivo_nombre',
         'ruta_origen',
-        'ruta_destino',
+        'ruta_hash',
         'paginas',
-        'hash',
+        'hash_pdf',
         'archivo_danado',
         'estado',
-        'user_id',
         'tomado_en',
+        'expira_en',
         'completado_en',
-        'progreso_archivo',
+        'tiempo_segundos',
     ];
 
     protected $casts = [
-        'tomado_en' => 'datetime',
-        'completado_en' => 'datetime',
-        'archivo_danado' => 'boolean',
-        'paginas' => 'integer',
+        'tomado_en'       => 'datetime',
+        'expira_en'       => 'datetime',
+        'completado_en'   => 'datetime',
+        'archivo_danado'  => 'boolean',
+        'paginas'         => 'integer',
+        'tiempo_segundos' => 'integer',
     ];
 
     public function usuario()

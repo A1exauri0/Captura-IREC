@@ -12,6 +12,7 @@ use App\Http\Controllers\PeticionAutorizacionController;
 use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\FlujoStellumController;
 use App\Http\Controllers\InventarioEquiposController;
+use App\Http\Controllers\DashboardAvanceController;
 
 // =========================================================================
 // AUTENTICACIÓN
@@ -27,6 +28,9 @@ Route::middleware(['auth'])->group(function () {
         if ($user && $user->hasRole(['Captura', 'Digitalizador']) && !$user->hasRole(['superadmin', 'administrador'])) {
             return redirect()->route('admin.captura.index');
         }
+        if ($user && $user->hasRole(['superadmin', 'administrador'])) {
+            return redirect()->route('admin.dashboard.avance');
+        }
         return redirect()->route('admin.analytics_sellos.reportes.lotes_trabajando');
     })->name('admin.index');
 
@@ -38,7 +42,7 @@ Route::middleware(['auth'])->group(function () {
         // Estación de captura y validación de PDFs
         Route::name('admin.captura.')->group(function () {
             Route::get('/', [CapturaController::class, 'index'])->name('index');
-            Route::get('/buscar-lote', [CapturaController::class, 'buscarLote'])->name('buscarLote');
+            Route::get('/buscar-pdf', [CapturaController::class, 'buscarPdf'])->name('buscarPdf');
             Route::get('/ver-pdf', [CapturaController::class, 'verPdf'])->name('verPdf');
             Route::get('/localidades', [CapturaController::class, 'obtenerLocalidades'])->name('localidades');
             Route::post('/renombrar', [CapturaController::class, 'renombrar'])->name('renombrar');
@@ -62,6 +66,9 @@ Route::middleware(['auth'])->group(function () {
     // Protegidas: los capturistas NO pueden acceder a ninguna ruta ni endpoint aquí
     // =========================================================================
     Route::prefix('admin')->middleware(['restringir.capturista'])->group(function () {
+
+        // Dashboard Ejecutivo de Avance Global (exclusivo Administrador / Superadmin)
+        Route::get('/dashboard-avance', [DashboardAvanceController::class, 'index'])->name('admin.dashboard.avance');
 
         // Centro de autorizaciones en tiempo real (WebSockets)
         Route::name('admin.autorizaciones.')->prefix('autorizaciones')->group(function () {

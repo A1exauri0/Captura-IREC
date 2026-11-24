@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Anio;
 use App\Models\Delegaciones;
-use App\Models\LoteCaptura;
+use App\Models\ArchivoSesion;
 use App\Models\User;
 
 class NotariasController extends Controller

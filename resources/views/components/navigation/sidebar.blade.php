@@ -6,6 +6,12 @@
         "section": "Operación",
         "items": [
             {
+                "label": "Dashboard de Avance",
+                "icon": "fa-solid fa-gauge-high",
+                "route": "admin.dashboard.avance",
+                "active_routes": ["admin.dashboard.avance"]
+            },
+            {
                 "label": "Estación de Captura",
                 "icon": "fa-solid fa-desktop",
                 "route": "admin.captura.index",
@@ -135,9 +141,21 @@ JSON;
     $sidebarMenuJsonLimpio = preg_replace('/\/\*.*?\*\//s', '', $sidebarMenuJson);
     $menuSections = json_decode($sidebarMenuJsonLimpio, true) ?: [];
 
-    // Si el usuario tiene rol exclusivo de Captura, solo mostrar la sección Operación (Estación de Captura)
+    // Si el usuario no es superadmin ni administrador, ocultar Dashboard de Avance; y si es Captura, dejar solo Estación de Captura
     $usrSidebar = auth()->user();
-    if ($usrSidebar && $usrSidebar->hasRole('Captura') && !$usrSidebar->hasAnyRole(['superadmin', 'administrador'])) {
+    $esAdminGlobal = $usrSidebar && $usrSidebar->hasAnyRole(['superadmin', 'administrador']);
+    if (!$esAdminGlobal) {
+        foreach ($menuSections as &$sec) {
+            if (!empty($sec['items'])) {
+                $sec['items'] = array_values(array_filter(
+                    $sec['items'],
+                    fn ($it) => ($it['route'] ?? '') !== 'admin.dashboard.avance'
+                ));
+            }
+        }
+        unset($sec);
+    }
+    if ($usrSidebar && $usrSidebar->hasRole('Captura') && !$esAdminGlobal) {
         $menuSections = array_values(array_filter($menuSections, fn ($s) => ($s['section'] ?? '') === 'Operación'));
     }
 @endphp

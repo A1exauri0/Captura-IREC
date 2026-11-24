@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Anio;
 use App\Models\Delegaciones;
-use App\Models\LoteCaptura;
+use App\Models\ArchivoSesion;
 use App\Models\User;
 use App\Models\Municipios;
 use App\Models\Localidades;
@@ -140,274 +140,176 @@ class CapturaController extends Controller
      * Busca el primer lote libre en el disco/entrega y delegación indicados.
      * Registra el lote como 'en_proceso' en la BD para bloquearlo.
      */
-    public function buscarLote(Request $request)
+    /**
+     * Asigna un único archivo PDF libre al capturista (bloqueo por archivo individual en archivos_sesiones).
+     * Reanuda automáticamente si el usuario ya tiene un archivo en_captura no expirado.
+     */
+    public function buscarPdf(Request $request)
     {
-        $disco = $request->query('disco') ?: 'irec';
+        $disco = $request->query('disco') ?: 'entrega_1_sellos';
         $delegacionId = $request->query('delegacion_id');
         $userId = Auth::id();
+        $tipoDoc = 'sellos';
 
-        // 0. Intentar primero consultar indice_archivos_pdfs en Stellum (si está disponible)
-        $asignacion = AsignacionCapturaUsuario::where('user_id', $userId)->where('activo', true)->first();
-        $tipoDoc = 'sellos'; // $asignacion?->tipo_documento ?? 'sellos';
+        // 0. Liberar sesiones expiradas (> 15 min inactivas)
+        ArchivoSesion::where('estado', 'en_captura')
+            ->whereNotNull('expira_en')
+            ->where('expira_en', '<', now())
+            ->delete();
+
+        // 1. Reanudar: si el usuario ya tiene un archivo individual en_captura, devolvérselo
+        $sesionActiva = ArchivoSesion::where('user_id', $userId)
+            ->where('estado', 'en_captura')
+            ->first();
+
+        if ($sesionActiva) {
+            $sesionActiva->update(['expira_en' => now()->addMinutes(15)]);
+            $delActiva = $sesionActiva->delegacion_id ? Delegaciones::find($sesionActiva->delegacion_id) : null;
+            $rutaVisor = $sesionActiva->indice_pdf_id
+                ? ('stellum:' . $sesionActiva->indice_pdf_id)
+                : $sesionActiva->ruta_origen;
+
+            return response()->json([
+                'ok'            => true,
+                'fuente'        => $sesionActiva->indice_pdf_id ? 'stellum' : 'directorio_directo',
+                'lote_id'       => $sesionActiva->id,
+                'lote'          => $sesionActiva->archivo_nombre,
+                'delegacion'    => $delActiva ? [
+                    'id'     => $delActiva->id,
+                    'clave'  => str_pad($delActiva->clave ?? $delActiva->id, 2, '0', STR_PAD_LEFT),
+                    'nombre' => $delActiva->nombre,
+                ] : null,
+                'archivos'      => [[
+                    'sesion_id'     => $sesionActiva->id,
+                    'indice_pdf_id' => $sesionActiva->indice_pdf_id,
+                    'ruta'          => $rutaVisor,
+                    'ruta_origen'   => $sesionActiva->ruta_origen,
+                    'nombre'        => $sesionActiva->archivo_nombre,
+                    'paginas'       => (int) $sesionActiva->paginas,
+                    'hash'          => $sesionActiva->hash_pdf,
+                    'tipo'          => $sesionActiva->tipo_archivo,
+                ]],
+                'total'         => 1,
+            ]);
+        }
+
         $delFiltro = $delegacionId ? Delegaciones::find($delegacionId) : null;
 
+        // 2. Consultar EXCLUSIVAMENTE indice_archivos_pdfs en Stellum (paginación por cursor after_id)
         try {
             $bridge = app(StellumBridgeService::class);
-            $respStellum = $bridge->listarIndice([
-                'tipo'       => $tipoDoc,
-                'delegacion' => $delFiltro?->nombre,
-                'limit'      => 100,
-            ]);
+            $afterId = 0;
+            $maxPaginas = 20; // hasta 2,000 registros por ciclo sin OFFSET
 
-            if (!empty($respStellum['ok']) && !empty($respStellum['items'])) {
-                $listaStellum = array_values(array_map(function ($item) {
-                    return [
-                        'indice_pdf_id' => $item['id'] ?? null,
-                        'ruta'          => 'stellum:' . ($item['id'] ?? 0),
-                        'ruta_origen'   => $item['ruta'] ?? '',
-                        'nombre'        => preg_replace('/\.pdf$/i', '', (string) ($item['nombre'] ?? 'archivo')),
-                        'paginas'       => (int) ($item['paginas'] ?? 1),
-                        'hash'          => $item['hash'] ?? null,
-                    ];
-                }, $respStellum['items']));
-
-                return response()->json([
-                    'ok'            => true,
-                    'fuente'        => 'stellum',
-                    'lote_id'       => 0,
-                    'lote'          => 'Stellum (' . strtoupper($tipoDoc) . ')',
-                    'ruta_relativa' => 'stellum/' . $tipoDoc,
-                    'delegacion'    => $delFiltro ? [
-                        'id'     => $delFiltro->id,
-                        'clave'  => str_pad($delFiltro->clave ?? $delFiltro->id, 2, '0', STR_PAD_LEFT),
-                        'nombre' => $delFiltro->nombre,
-                    ] : null,
-                    'archivos'      => $listaStellum,
-                    'total'         => count($listaStellum),
+            for ($paginaCursor = 0; $paginaCursor < $maxPaginas; $paginaCursor++) {
+                $respStellum = $bridge->listarIndice([
+                    'tipo'          => $tipoDoc,
+                    'clasificacion' => 'entregable',
+                    'delegacion'    => $delFiltro?->nombre,
+                    'after_id'      => $afterId,
+                    'limit'         => 100,
                 ]);
-            }
-        } catch (\Throwable $e) {
-            // Fallback automático a lectura directa en los directorios configurados
-        }
 
-        // FALLBACK DIRECTO A DIRECTORIOS DE RED CONFIGURADOS (config/captura_pdf.php)
-        $rutaConfigurada = $this->obtenerRutaRaizConfigurada($disco);
-        if (!in_array($disco, ['irec', 'cats', 'rciv']) && !$rutaConfigurada) {
-            $disco = 'irec';
-        }
-
-        $storage = in_array($disco, ['irec', 'cats', 'rciv'])
-            ? Storage::disk($disco)
-            : Storage::build(['driver' => 'local', 'root' => $rutaConfigurada]);
-
-        // 1. Reanudar: Verificar si el usuario ya tiene un lote en proceso en este disco
-        $queryExistente = LoteCaptura::where('disco', $disco)
-            ->where('estado', 'en_proceso')
-            ->where('user_id', $userId);
-
-        if ($delegacionId) {
-            $queryExistente->where('delegacion_id', $delegacionId);
-        }
-
-        $loteExistente = $queryExistente->first();
-
-        if ($loteExistente) {
-            $carpeta = $loteExistente->ruta_relativa;
-            $rutaFisicaCarpeta = $storage->path($carpeta);
-            if (is_dir($rutaFisicaCarpeta)) {
-                $pdfs = glob($rutaFisicaCarpeta . DIRECTORY_SEPARATOR . '*.pdf');
-                if (empty($pdfs)) {
-                    $loteExistente->update([
-                        'estado' => 'completado',
-                        'completado_en' => now()
-                    ]);
-                } else {
-                    $raizDisco = $storage->path('');
-                    $listaPdfs = array_values(array_map(function ($f) use ($raizDisco) {
-                        $relativa = str_replace('\\', '/', ltrim(str_replace($raizDisco, '', $f), '\\/'));
-                        return [
-                            'ruta' => $relativa,
-                            'nombre' => pathinfo($f, PATHINFO_FILENAME),
-                        ];
-                    }, $pdfs));
-
-                    $delExistente = Delegaciones::find($loteExistente->delegacion_id);
-
+                if (empty($respStellum['ok'])) {
                     return response()->json([
-                        'ok' => true,
-                        'lote_id' => $loteExistente->id,
-                        'lote' => $loteExistente->nombre_lote,
-                        'ruta_relativa' => $carpeta,
-                        'delegacion' => $delExistente ? [
-                            'id' => $delExistente->id,
-                            'clave' => str_pad($delExistente->clave ?? $delExistente->id, 2, '0', STR_PAD_LEFT),
-                            'nombre' => $delExistente->nombre,
-                        ] : null,
-                        'archivos' => $listaPdfs,
-                        'total' => count($listaPdfs),
+                        'ok'      => false,
+                        'mensaje' => 'No se pudo consultar indice_archivos_pdfs en Stellum: ' . ($respStellum['error'] ?? ('HTTP ' . ($respStellum['status'] ?? 'error'))),
                     ]);
                 }
-            }
-        }
 
-        // 2. Determinar las delegaciones a examinar
-        if ($delegacionId) {
-            $delegacion = Delegaciones::find($delegacionId);
-            $delegacionesAExaminar = $delegacion ? [$delegacion] : [];
-        } else {
-            // Búsqueda automática en todas las delegaciones activas
-            $delegacionesAExaminar = Delegaciones::where('estatus', 1)->orderBy('id')->get();
-        }
-
-        if (empty($delegacionesAExaminar)) {
-            return response()->json(['ok' => false, 'mensaje' => 'No se encontraron delegaciones para buscar lotes.']);
-        }
-
-        $raizDisco = $storage->path('');
-
-        foreach ($delegacionesAExaminar as $del) {
-            $rutaBase = $this->resolverCarpetaDelegacion($storage, 'Respaldo_Original', $del->nombre);
-            if (!$rutaBase) {
-                continue;
-            }
-
-            $rutaFisicaBase = $storage->path($rutaBase);
-            $entradas = @scandir($rutaFisicaBase);
-            if ($entradas === false) {
-                continue;
-            }
-
-            $carpetas = [];
-            foreach ($entradas as $entrada) {
-                if ($entrada === '.' || $entrada === '..') {
-                    continue;
-                }
-                $rutaCompleta = $rutaFisicaBase . DIRECTORY_SEPARATOR . $entrada;
-                if (is_dir($rutaCompleta)) {
-                    $carpetas[] = $entrada;
-                }
-            }
-
-            // Ordenamiento natural (Lote 1, Lote 2... Lote 10)
-            usort($carpetas, function ($a, $b) {
-                $numA = $this->extraerNumeroLote($a);
-                $numB = $this->extraerNumeroLote($b);
-                return $numA - $numB;
-            });
-
-            foreach ($carpetas as $nombreLote) {
-                // Solo aceptar carpetas que empiecen con "Lote"
-                if (!preg_match('/^Lote\s/i', $nombreLote)) {
-                    continue;
+                $items = $respStellum['items'] ?? [];
+                if (empty($items)) {
+                    break;
                 }
 
-                // Ignorar carpetas terminadas (nombre termina en " OK")
-                if (preg_match('/\sOK$/i', $nombreLote)) {
-                    continue;
-                }
+                foreach ($items as $item) {
+                    $indiceId = isset($item['id']) ? (int) $item['id'] : null;
+                    if (!$indiceId) {
+                        continue;
+                    }
 
-                $rutaRelativa = $rutaBase . '/' . $nombreLote;
+                    $rutaOrigen = (string) ($item['ruta'] ?? ('stellum:' . $indiceId));
+                    $rutaHash = hash('sha256', $rutaOrigen);
 
-                // Verificar si ya está en la BD
-                $existe = LoteCaptura::where('disco', $disco)
-                    ->where('ruta_relativa', $rutaRelativa)
-                    ->whereIn('estado', ['en_proceso', 'completado'])
-                    ->exists();
+                    $yaTomado = ArchivoSesion::where(function ($q) use ($rutaHash, $indiceId) {
+                            $q->where('ruta_hash', $rutaHash)
+                              ->orWhere('indice_pdf_id', $indiceId);
+                        })
+                        ->whereIn('estado', ['en_captura', 'completado'])
+                        ->exists();
 
-                if ($existe) {
-                    continue;
-                }
+                    if ($yaTomado) {
+                        continue;
+                    }
 
-                // Verificar que tenga PDFs
-                $rutaFisicaLote = $rutaFisicaBase . DIRECTORY_SEPARATOR . $nombreLote;
-                $pdfs = glob($rutaFisicaLote . DIRECTORY_SEPARATOR . '*.pdf');
+                    $nombreSinExt = preg_replace('/\.pdf$/i', '', (string) ($item['nombre'] ?? 'archivo'));
 
-                if (empty($pdfs)) {
-                    continue;
-                }
+                    // Resolver delegación desde el registro de indice_archivos_pdfs si no venía filtrada
+                    $delItem = $delFiltro;
+                    if (!$delItem && !empty($item['delegacion'])) {
+                        $delItem = Delegaciones::whereRaw('LOWER(nombre) = ?', [strtolower(trim((string) $item['delegacion']))])->first();
+                    }
 
-                // Asignar el lote al usuario actual
-                $loteCaptura = LoteCaptura::create([
-                    'disco' => $disco,
-                    'delegacion_id' => $del->id,
-                    'nombre_lote' => $nombreLote,
-                    'ruta_relativa' => $rutaRelativa,
-                    'estado' => 'en_proceso',
-                    'user_id' => $userId,
-                    'tomado_en' => now(),
-                ]);
+                    try {
+                        $nuevaSesion = ArchivoSesion::create([
+                            'user_id'        => $userId,
+                            'indice_pdf_id'  => $indiceId,
+                            'disco'          => 'indice_archivos_pdfs',
+                            'tipo_archivo'   => $tipoDoc,
+                            'delegacion_id'  => $delItem?->id,
+                            'pc'             => $request->ip(),
+                            'archivo_nombre' => $nombreSinExt,
+                            'ruta_origen'    => $rutaOrigen,
+                            'ruta_hash'      => $rutaHash,
+                            'paginas'        => (int) ($item['paginas'] ?? 1),
+                            'hash_pdf'       => $item['hash'] ?? null,
+                            'estado'         => 'en_captura',
+                            'tomado_en'      => now(),
+                            'expira_en'      => now()->addMinutes(15),
+                        ]);
 
-                $listaPdfs = array_values(array_map(function ($f) use ($raizDisco) {
-                    $relativa = str_replace('\\', '/', ltrim(str_replace($raizDisco, '', $f), '\\/'));
-                    return [
-                        'ruta' => $relativa,
-                        'nombre' => pathinfo($f, PATHINFO_FILENAME),
-                    ];
-                }, $pdfs));
-
-                return response()->json([
-                    'ok' => true,
-                    'lote_id' => $loteCaptura->id,
-                    'lote' => $nombreLote,
-                    'ruta_relativa' => $rutaRelativa,
-                    'delegacion' => [
-                        'id' => $del->id,
-                        'clave' => str_pad($del->clave ?? $del->id, 2, '0', STR_PAD_LEFT),
-                        'nombre' => $del->nombre,
-                    ],
-                    'archivos' => $listaPdfs,
-                    'total' => count($listaPdfs),
-                ]);
-            }
-        }
-
-        // Fallback final: si es una ruta de entrega directa (sin estructura Respaldo_Original/Lote N),
-        // escanear directamente los PDFs en el directorio configurado (hasta 200 por lote)
-        if ($rutaConfigurada && is_dir($rutaConfigurada)) {
-            $pdfsDirectos = [];
-            try {
-                $iter = new \RecursiveIteratorIterator(
-                    new \RecursiveDirectoryIterator($rutaConfigurada, \FilesystemIterator::SKIP_DOTS),
-                    \RecursiveIteratorIterator::SELF_FIRST
-                );
-                foreach ($iter as $fileInfo) {
-                    if ($fileInfo->isFile() && strtolower($fileInfo->getExtension()) === 'pdf') {
-                        $rutaCompleta = $fileInfo->getPathname();
-                        $relativa = str_replace('\\', '/', ltrim(str_replace($rutaConfigurada, '', $rutaCompleta), '\\/'));
-                        $pdfsDirectos[] = [
-                            'ruta'        => $relativa,
-                            'ruta_origen' => $rutaCompleta,
-                            'nombre'      => pathinfo($rutaCompleta, PATHINFO_FILENAME),
-                        ];
-                        if (count($pdfsDirectos) >= 200) {
-                            break;
-                        }
+                        return response()->json([
+                            'ok'         => true,
+                            'fuente'     => 'stellum',
+                            'lote_id'    => $nuevaSesion->id,
+                            'lote'       => $nombreSinExt,
+                            'delegacion' => $delItem ? [
+                                'id'     => $delItem->id,
+                                'clave'  => str_pad($delItem->clave ?? $delItem->id, 2, '0', STR_PAD_LEFT),
+                                'nombre' => $delItem->nombre,
+                            ] : null,
+                            'archivos'   => [[
+                                'sesion_id'     => $nuevaSesion->id,
+                                'indice_pdf_id' => $indiceId,
+                                'ruta'          => 'stellum:' . $indiceId,
+                                'ruta_origen'   => $rutaOrigen,
+                                'nombre'        => $nombreSinExt,
+                                'paginas'       => (int) ($item['paginas'] ?? 1),
+                                'hash'          => $item['hash'] ?? null,
+                                'tipo'          => $item['tipo'] ?? $tipoDoc,
+                                'clasificacion' => $item['clasificacion'] ?? null,
+                            ]],
+                            'total'      => 1,
+                        ]);
+                    } catch (\Throwable $e) {
+                        // Otro capturista tomó este archivo en el mismo milisegundo; continuar con el siguiente
+                        continue;
                     }
                 }
-            } catch (\Throwable $e) {
-                // Directorio de red inaccesible desde esta máquina
-            }
 
-            if (!empty($pdfsDirectos)) {
-                $delPrimero = $delegacionesAExaminar[0] ?? null;
-                return response()->json([
-                    'ok'            => true,
-                    'fuente'        => 'directorio_directo',
-                    'lote_id'       => 0,
-                    'lote'          => basename($rutaConfigurada),
-                    'ruta_relativa' => '',
-                    'delegacion'    => $delPrimero ? [
-                        'id'     => $delPrimero->id,
-                        'clave'  => str_pad($delPrimero->clave ?? $delPrimero->id, 2, '0', STR_PAD_LEFT),
-                        'nombre' => $delPrimero->nombre,
-                    ] : null,
-                    'archivos'      => $pdfsDirectos,
-                    'total'         => count($pdfsDirectos),
-                ]);
+                if (empty($respStellum['has_more'])) {
+                    break;
+                }
+                $afterId = (int) ($respStellum['last_id'] ?? $afterId);
             }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok'      => false,
+                'mensaje' => 'Error al consultar indice_archivos_pdfs en Stellum: ' . $e->getMessage(),
+            ]);
         }
 
-        return response()->json(['ok' => false, 'mensaje' => 'No hay más lotes disponibles para capturar (ni en Stellum ni en los directorios locales/red).']);
+        return response()->json(['ok' => false, 'mensaje' => 'No hay archivos PDF disponibles en indice_archivos_pdfs para capturar.']);
     }
 
     /**
@@ -466,60 +368,32 @@ class CapturaController extends Controller
     // =========================================================
 
     /**
-     * Sirve un PDF desde el disco de red al iframe del navegador.
+     * Sirve un PDF exclusivamente desde indice_archivos_pdfs vía proxy server-side hacia Stellum
+     * (mismo origen para el iframe, sin CORS y sin exponer STELLUM_BRIDGE_TOKEN al navegador).
      */
     public function verPdf(Request $request)
     {
-        $disco = $request->query('disco');
         $ruta = (string) $request->query('ruta', '');
 
-        // Si el PDF proviene de Stellum (prefijo stellum:{id}), hacer streaming directo desde el puente
         if (str_starts_with($ruta, 'stellum:')) {
             $indiceId = (int) substr($ruta, 8);
             if ($indiceId > 0) {
                 $bridge = app(StellumBridgeService::class);
-                return redirect()->away($bridge->urlStreamPdf($indiceId));
-            }
-        }
+                $resp = $bridge->obtenerStreamPdf($indiceId);
 
-        $rutaConfigurada = $this->obtenerRutaRaizConfigurada($disco);
-        if (!in_array($disco, ['irec', 'cats', 'rciv']) && !$rutaConfigurada) {
-            abort(400, 'Disco o ruta de entrega no válida.');
-        }
-
-        $storage = in_array($disco, ['irec', 'cats', 'rciv'])
-            ? Storage::disk($disco)
-            : Storage::build(['driver' => 'local', 'root' => $rutaConfigurada]);
-
-        // Obtener la ruta física completa del disco configurado vía .env
-        $rutaFisica = $storage->path($ruta);
-
-        if (!file_exists($rutaFisica)) {
-            // Intentar resolver discrepancia de acentos/casing en el directorio
-            $partes = explode('/', str_replace('\\', '/', $ruta));
-            if (count($partes) >= 2) {
-                $subBase = $partes[0];
-                $nombreDel = $partes[1];
-                $resuelto = $this->resolverCarpetaDelegacion($storage, $subBase, $nombreDel);
-                if ($resuelto) {
-                    $partes[0] = dirname($resuelto) === '.' ? $subBase : dirname($resuelto);
-                    $partes[1] = basename($resuelto);
-                    $rutaCorregida = implode('/', $partes);
-                    $rutaFisica = $storage->path($rutaCorregida);
+                if (!$resp->successful()) {
+                    abort($resp->status() === 404 ? 404 : 502, 'No se pudo obtener el PDF desde Stellum.');
                 }
+
+                return response($resp->body(), 200, [
+                    'Content-Type'        => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="documento.pdf"',
+                    'Cache-Control'       => 'private, max-age=300',
+                ]);
             }
         }
 
-        if (!file_exists($rutaFisica)) {
-            abort(404, 'Archivo no encontrado: ' . $ruta);
-        }
-
-        // Servir directamente por streaming (no carga todo en memoria como Storage::get)
-        return response()->file($rutaFisica, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline',
-            'Cache-Control' => 'no-cache, no-store, must-revalidate',
-        ]);
+        abort(404, 'Solo se permiten archivos provenientes de indice_archivos_pdfs (Stellum).');
     }
 
     // =========================================================
@@ -535,14 +409,52 @@ class CapturaController extends Controller
         $usuario = Auth::user();
         $asignacion = AsignacionCapturaUsuario::where('user_id', $usuario?->id)->where('activo', true)->first();
 
-        $tipoDocumento = strtolower((string) ($request->input('tipo_documento') ?: ($asignacion?->tipo_documento ?? 'sellos')));
+        // Recuperar la sesión individual activa del archivo (fuente de verdad de ruta_origen, paginas, hash e indice_pdf_id)
+        $sesionIdReq = $request->input('sesion_id') ? (int) $request->input('sesion_id') : null;
+        $sesionActiva = null;
+        if ($sesionIdReq) {
+            $sesionActiva = ArchivoSesion::where('id', $sesionIdReq)
+                ->when($usuario, fn ($q) => $q->where('user_id', $usuario->id))
+                ->first();
+        }
+        if (!$sesionActiva && $usuario) {
+            $sesionActiva = ArchivoSesion::where('user_id', $usuario->id)
+                ->where('estado', 'en_captura')
+                ->latest('id')
+                ->first();
+        }
+
+        $tipoDocumento = strtolower((string) ($request->input('tipo_documento') ?: ($sesionActiva?->tipo_archivo ?: ($asignacion?->tipo_documento ?? 'sellos'))));
         if (!in_array($tipoDocumento, ['registros', 'sellos', 'notarias', 'catastro'])) {
             $tipoDocumento = 'sellos';
         }
 
-        $rutaOrigen = (string) ($request->input('ruta_origen') ?: $request->input('ruta_original') ?: $request->input('ruta_archivo') ?: '');
-        $archivoOriginal = (string) ($request->input('archivo_original') ?: pathinfo($rutaOrigen, PATHINFO_FILENAME));
-        $archivoNuevo    = (string) ($request->input('nuevo_nombre') ?: $request->input('archivo_nuevo') ?: $archivoOriginal);
+        // Resolver ruta_origen real (nunca guardar "stellum:ID" como ruta ni como nombre de archivo)
+        $rutaReq = trim((string) ($request->input('ruta_origen') ?: $request->input('ruta_original') ?: $request->input('ruta_archivo') ?: ''));
+        $indiceDesdeRuta = str_starts_with($rutaReq, 'stellum:') ? (int) substr($rutaReq, 8) : null;
+
+        $rutaOrigen = ($rutaReq !== '' && !str_starts_with($rutaReq, 'stellum:'))
+            ? $rutaReq
+            : (string) ($sesionActiva?->ruta_origen ?? '');
+
+        $indicePdfId = $request->input('indice_pdf_id')
+            ? (int) $request->input('indice_pdf_id')
+            : ($sesionActiva?->indice_pdf_id ?: $indiceDesdeRuta);
+
+        $archivoOriginalReq = trim((string) $request->input('archivo_original', ''));
+        if ($archivoOriginalReq !== '' && !str_starts_with($archivoOriginalReq, 'stellum:')) {
+            $archivoOriginal = $archivoOriginalReq;
+        } elseif (!empty($sesionActiva?->archivo_nombre)) {
+            $archivoOriginal = (string) $sesionActiva->archivo_nombre;
+        } else {
+            $archivoOriginal = pathinfo(str_replace('\\', '/', $rutaOrigen), PATHINFO_FILENAME);
+        }
+
+        $archivoNuevoReq = trim((string) ($request->input('nuevo_nombre') ?: $request->input('archivo_nuevo') ?: ''));
+        $archivoNuevo = ($archivoNuevoReq !== '' && !str_starts_with($archivoNuevoReq, 'stellum:'))
+            ? $archivoNuevoReq
+            : $archivoOriginal;
+
         $archivoOriginalLimpio = preg_replace('/\.pdf$/i', '', trim($archivoOriginal));
         $archivoNuevoLimpio    = preg_replace('/\.pdf$/i', '', trim($archivoNuevo));
 
@@ -555,14 +467,23 @@ class CapturaController extends Controller
             $accion = strcasecmp($archivoOriginalLimpio, $archivoNuevoLimpio) === 0 ? 'validado' : 'renombrado';
         }
 
-        $delegacionId = $request->input('delegacion_id') ?: $asignacion?->delegacion_id;
+        $delegacionId = $request->input('delegacion_id') ?: $sesionActiva?->delegacion_id ?: $asignacion?->delegacion_id;
         $delegacionObj = $delegacionId ? Delegaciones::find($delegacionId) : null;
         $delegacionNombre = $delegacionObj?->nombre ?? 'GENERAL';
         $tipoSello = $request->input('tipo_sello') ?: $asignacion?->tipo_sello;
-        $lote = $request->input('nombre_lote') ?: $request->input('lote') ?: 'LOTE_GENERAL';
-        $directorio = $request->input('directorio') ?: $request->input('disco') ?: $delegacionNombre;
-        $indicePdfId = $request->input('indice_pdf_id') ? (int) $request->input('indice_pdf_id') : null;
-        $paginas = (int) $request->input('paginas', 1);
+
+        // Extraer carpeta/lote real desde ruta_origen si no viene explícito o si venía igual al nombre de archivo
+        $carpetaPadre = $rutaOrigen !== '' ? basename(dirname(str_replace('\\', '/', $rutaOrigen))) : '';
+        $loteReq = trim((string) ($request->input('nombre_lote') ?: $request->input('lote') ?: ''));
+        $lote = ($carpetaPadre !== '' && $carpetaPadre !== '.' && $carpetaPadre !== '/')
+            ? $carpetaPadre
+            : ($loteReq !== '' ? $loteReq : 'LOTE_GENERAL');
+
+        $directorio = $request->input('directorio') ?: $request->input('disco') ?: ($sesionActiva?->disco ?: $delegacionNombre);
+        $paginas = $request->filled('paginas') && (int) $request->input('paginas') > 0
+            ? (int) $request->input('paginas')
+            : (int) ($sesionActiva?->paginas ?: 1);
+        $hashPdf = trim((string) $request->input('hash', '')) ?: ($sesionActiva?->hash_pdf ?: null);
 
         // Catálogo de inconsistencias (R01-R09)
         $codigoInconsistencia = null;
@@ -600,8 +521,9 @@ class CapturaController extends Controller
             }
         }
 
-        // Calcular ruta_propuesta según config/reglas_destino_pdf.php
+        // Calcular ruta_propuesta conservando la ruta de entregables y ajustando carpeta hasta el año + archivo
         $rutaPropuesta = RutaPropuestaService::generar($tipoDocumento, [
+            'ruta_origen'           => $rutaOrigen,
             'delegacion'            => $delegacionNombre,
             'tipo_sello'            => $tipoSello ?: 'GENERAL',
             'lote'                  => $lote,
@@ -618,6 +540,10 @@ class CapturaController extends Controller
             default    => 'auditoria_registros',
         };
 
+        $segs = ($sesionActiva && $sesionActiva->tomado_en)
+            ? (int) max(0, round($sesionActiva->tomado_en->diffInSeconds(now(), false)))
+            : null;
+
         $registro = [
             'fecha_hora'                => now()->format('Y-m-d H:i:s'),
             'turno'                     => $usuario?->turnoRelacion?->nombre ?? $usuario?->turno ?? 'Matutino',
@@ -632,7 +558,9 @@ class CapturaController extends Controller
             'ruta'                      => $rutaOrigen,
             'ruta_origen'               => $rutaOrigen,
             'ruta_propuesta'            => $rutaPropuesta,
-            'ruta_destino'              => $rutaPropuesta,
+            'ruta_destino'              => null,
+            'hash'                      => $hashPdf,
+            'archivo_danado'            => false,
             'indice_pdf_id'             => $indicePdfId,
             'revisar'                   => $revisar,
             'archivo_colision_id'       => $archivoColisionId,
@@ -644,6 +572,7 @@ class CapturaController extends Controller
             'estado_aplicacion'         => 'pendiente',
             'detalles'                  => $detallesBase ?: null,
             'paginas'                   => $paginas,
+            'tiempo_captura'            => $segs,
             'created_at'                => now(),
             'updated_at'                => now(),
         ];
@@ -656,6 +585,15 @@ class CapturaController extends Controller
         }
 
         $auditoriaId = DB::table($tabla)->insertGetId($registro);
+
+        // Cerrar la sesión individual del archivo actual y registrar tiempo real de captura (si no es duplicar)
+        if ($accion !== 'duplicar' && $sesionActiva && $sesionActiva->estado === 'en_captura') {
+            $sesionActiva->update([
+                'estado'          => 'completado',
+                'completado_en'   => now(),
+                'tiempo_segundos' => $segs,
+            ]);
+        }
 
         // Si es inconsistencia, notificar en tiempo real a la campana del navbar del administrador
         if ($accion === 'inconsistencia') {
@@ -865,19 +803,21 @@ class CapturaController extends Controller
     // =========================================================
 
     /**
-     * Libera un lote marcándolo como disponible (elimina el registro).
+     * Libera la sesión de archivo individual activa del usuario.
      */
     public function liberarLote(Request $request)
     {
-        $loteId = $request->input('lote_id');
-        $lote = LoteCaptura::find($loteId);
+        $sesionId = $request->input('lote_id');
+        $query = ArchivoSesion::where('user_id', Auth::id())->where('estado', 'en_captura');
+        if ($sesionId) {
+            $query->where('id', $sesionId);
+        }
 
-        if ($lote && $lote->user_id === Auth::id()) {
-            $lote->delete();
+        if ($query->delete() > 0) {
             return response()->json(['ok' => true]);
         }
 
-        return response()->json(['ok' => false, 'mensaje' => 'No se puede liberar el lote.']);
+        return response()->json(['ok' => false, 'mensaje' => 'No hay sesión de archivo activa para liberar.']);
     }
 
     // =========================================================
@@ -1263,141 +1203,95 @@ class CapturaController extends Controller
         }
 
         if ($liberar) {
-            if ($categoria === 'Calidad') {
-                // En Calidad conservamos el progreso al liberar
-                LoteCaptura::where('user_id', $userId)
-                    ->where('estado', 'en_proceso')
-                    ->update([
-                        'user_id' => null,
-                        'tomado_en' => null,
-                    ]);
-            } else {
-                LoteCaptura::where('user_id', $userId)->where('estado', 'en_proceso')->delete();
-            }
+            ArchivoSesion::where('user_id', $userId)->where('estado', 'en_captura')->delete();
             return response()->json([
                 'ok' => true,
-                'mensaje' => 'Sesión liberada correctamente.',
+                'mensaje' => 'Sesión de archivo liberada correctamente.',
             ]);
         }
 
         $rutaRelativa = $request->input('ruta_relativa');
         $rutaFinal = !empty($rutaRelativa) ? $rutaRelativa : ($directorio . '/' . $lote);
+        $rutaHash = hash('sha256', (string) $rutaFinal);
 
-        // Asegurar que existan usuario y delegación para evitar violaciones de clave foránea
         $this->asegurarUsuarioExiste($userId);
         if ($delegacionId) {
             $this->asegurarDelegacionExiste($delegacionId);
         }
 
-        // Transacción atómica con verificación de colisión
-        $resultado = DB::transaction(function () use ($userId, $directorio, $rutaFinal, $delegacionId, $lote, $progresoArchivo) {
-            // 1. Liberar automáticamente sesiones inactivas de este lote (más de 30 minutos sin actualizar)
-            if ($directorio && $rutaFinal) {
-                $sesionInactiva = LoteCaptura::where('ruta_relativa', $rutaFinal)
-                    ->where('disco', $directorio)
-                    ->where('estado', 'en_proceso')
-                    ->where('updated_at', '<', now()->subMinutes(30))
-                    ->first();
-
-                if ($sesionInactiva) {
-                    if (str_contains(strtolower($rutaFinal), 'calidad_')) {
-                        // En calidad liberamos la asignación de usuario pero conservamos el registro con su progreso
-                        $sesionInactiva->update([
-                            'user_id' => null,
-                            'tomado_en' => null,
-                        ]);
-                    } else {
-                        $sesionInactiva->delete();
-                    }
-                }
-
-                // 2. Verificar si OTRO usuario ya tiene este lote reservado (usando la ruta relativa única)
-                $ocupante = LoteCaptura::where('ruta_relativa', $rutaFinal)
-                    ->where('disco', $directorio)
-                    ->where('estado', 'en_proceso')
-                    ->whereNotNull('user_id')
-                    ->where('user_id', '!=', $userId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($ocupante) {
-                    // El lote ya está ocupado por otro usuario → RECHAZAR
-                    $nombreOcupante = '';
-                    $usuarioOcupante = User::find($ocupante->user_id);
-                    if ($usuarioOcupante) {
-                        $nombreOcupante = $usuarioOcupante->name ?? $usuarioOcupante->user ?? 'Usuario #' . $ocupante->user_id;
-                    }
-                    return [
-                        'ok' => false,
-                        'mensaje' => "El lote '{$lote}' ya está siendo trabajado por {$nombreOcupante}.",
-                        'ocupado_por' => $nombreOcupante,
-                        'ocupado_por_id' => $ocupante->user_id,
-                    ];
-                }
-            }
-
-            // 2. Limpiar sesiones previas del mismo usuario (un usuario solo puede tener 1 lote)
-            LoteCaptura::where('user_id', $userId)
-                ->where('estado', 'en_proceso')
+        $resultado = DB::transaction(function () use ($userId, $directorio, $rutaFinal, $rutaHash, $delegacionId, $lote, $request) {
+            ArchivoSesion::where('estado', 'en_captura')
+                ->whereNotNull('expira_en')
+                ->where('expira_en', '<', now())
                 ->delete();
 
-            // 3. Crear o actualizar la sesión activa
-            $datosUpdate = [
-                'user_id' => $userId,
-                'estado' => 'en_proceso',
-                'delegacion_id' => $delegacionId,
-                'nombre_lote' => $lote ?? '',
-                'tomado_en' => now(),
-                'completado_en' => null,
-            ];
+            $ocupante = ArchivoSesion::where('ruta_hash', $rutaHash)
+                ->where('estado', 'en_captura')
+                ->where('user_id', '!=', $userId)
+                ->lockForUpdate()
+                ->first();
 
-            if (!empty($progresoArchivo)) {
-                $datosUpdate['progreso_archivo'] = $progresoArchivo;
+            if ($ocupante) {
+                $usuarioOcupante = User::find($ocupante->user_id);
+                $nombreOcupante = $usuarioOcupante ? ($usuarioOcupante->name ?? $usuarioOcupante->user) : ('Usuario #' . $ocupante->user_id);
+                return [
+                    'ok' => false,
+                    'mensaje' => "El archivo '{$lote}' ya está siendo trabajado por {$nombreOcupante}.",
+                    'ocupado_por' => $nombreOcupante,
+                    'ocupado_por_id' => $ocupante->user_id,
+                ];
             }
 
-            $sesion = LoteCaptura::updateOrCreate(
+            ArchivoSesion::where('user_id', $userId)->where('estado', 'en_captura')->delete();
+
+            $sesion = ArchivoSesion::updateOrCreate(
+                ['ruta_hash' => $rutaHash],
                 [
-                    'disco' => $directorio ?? '',
-                    'ruta_relativa' => $rutaFinal ?? '',
-                ],
-                $datosUpdate
+                    'user_id'        => $userId,
+                    'disco'          => $directorio ?: 'sellos',
+                    'tipo_archivo'   => 'sellos',
+                    'delegacion_id'  => $delegacionId,
+                    'pc'             => $request->ip(),
+                    'archivo_nombre' => $lote ?: basename((string) $rutaFinal),
+                    'ruta_origen'    => (string) $rutaFinal,
+                    'estado'         => 'en_captura',
+                    'tomado_en'      => now(),
+                    'expira_en'      => now()->addMinutes(15),
+                    'completado_en'  => null,
+                ]
             );
 
             return [
-                'ok' => true,
+                'ok'        => true,
                 'sesion_id' => $sesion->id,
-                'mensaje' => 'Sesión registrada correctamente.',
+                'mensaje'   => 'Sesión de archivo registrada correctamente.',
             ];
         });
 
-        $statusCode = $resultado['ok'] ? 200 : 409; // 409 = Conflicto
-        return response()->json($resultado, $statusCode);
+        return response()->json($resultado, $resultado['ok'] ? 200 : 409);
     }
 
     /**
-     * Obtiene la lista de usuarios con sesiones activas (en_proceso) unificadas en LoteCaptura.
+     * Obtiene la lista de usuarios con sesiones activas por archivo individual (archivos_sesiones).
      */
     public function obtenerSesiones(Request $request)
     {
-        $sesionesUnificadas = LoteCaptura::where('estado', 'en_proceso')
+        $sesionesUnificadas = ArchivoSesion::where('estado', 'en_captura')
             ->with(['usuario:id,name,user', 'delegacion:id,nombre,clave'])
             ->get()
-            ->map(function ($lote) {
-                $esNotaria = ($lote->tipo_archivo === 'notarias' || !empty($lote->notaria_nombre));
-                $notariaId = $esNotaria ? preg_replace('/[^0-9]/', '', $lote->notaria_nombre ?? '') : null;
-
+            ->map(function ($s) {
                 return [
-                    'id' => $lote->id,
-                    'user_id' => $lote->user_id,
-                    'usuario' => $lote->usuario ? $lote->usuario->name : null,
-                    'nombre_usuario' => $lote->usuario ? $lote->usuario->user : null,
-                    'delegacion_id' => $esNotaria ? (!empty($notariaId) ? (int) $notariaId : null) : $lote->delegacion_id,
-                    'delegacion' => $esNotaria ? $lote->notaria_nombre : ($lote->delegacion ? $lote->delegacion->nombre : null),
-                    'directorio' => $lote->disco,
-                    'lote' => $esNotaria ? ($lote->volumen ?: $lote->nombre_lote) : $lote->nombre_lote,
-                    'pc' => $lote->pc ?: $lote->ruta_relativa,
-                    'tomado_en' => $lote->tomado_en ? $lote->tomado_en->toDateTimeString() : null,
-                    'progreso_archivo' => $lote->progreso_archivo,
+                    'id'              => $s->id,
+                    'user_id'         => $s->user_id,
+                    'usuario'         => $s->usuario ? $s->usuario->name : null,
+                    'nombre_usuario'  => $s->usuario ? $s->usuario->user : null,
+                    'delegacion_id'   => $s->delegacion_id,
+                    'delegacion'       => $s->delegacion ? $s->delegacion->nombre : null,
+                    'directorio'       => $s->disco,
+                    'lote'             => $s->archivo_nombre,
+                    'pc'               => $s->pc,
+                    'tomado_en'        => $s->tomado_en ? $s->tomado_en->toDateTimeString() : null,
+                    'progreso_archivo' => $s->archivo_nombre,
                 ];
             });
 

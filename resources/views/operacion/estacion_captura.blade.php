@@ -49,7 +49,7 @@
             <!-- FILA 1: Estado, Preview compacto y Utilidades (Sin botón Config ni rutas visibles) -->
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3 min-w-0">
-                    <span class="text-sm font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Cargando lote...</span>
+                    <span class="text-sm font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Cargando PDF...</span>
                     <span class="px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-xs font-bold" id="lblCaptura">Primera captura</span>
                     <code id="lblPreviewNombreSellos" class="px-2.5 py-0.5 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-xs font-mono font-bold text-gray-800 dark:text-gray-100">—</code>
                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300" id="lblEstado">Listo para capturar</span>
@@ -87,52 +87,60 @@
                 </div>
             </div>
 
-            <!-- FILA 2: Solo los 9 Inputs de Captura (vacíos, pasando de input en input) + Acciones -->
+            <!-- FILA 2: Solo los 9 Inputs de la Regla de Sellos (Form1.vb: Del, Secc, Libro, Tomo, Vol, Fracc, Año, Inscr, Bis) -->
             <div class="flex flex-wrap lg:flex-nowrap items-end gap-3">
                 <div class="grid grid-cols-9 gap-2 flex-1 bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 shadow-sm">
                     <div>
                         <label for="selloDel" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">1. Del.</label>
-                        <input type="text" id="selloDel" data-auto-next="2" maxlength="2" value="" autocomplete="off"
+                        <input type="text" id="selloDel" data-idx="0" maxlength="2" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloSecc" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">2. Secc.</label>
-                        <input type="text" id="selloSecc" data-auto-next="2" maxlength="2" value="" autocomplete="off"
+                        <input type="text" id="selloSecc" data-idx="1" maxlength="3" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloLibro" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">3. Libro</label>
-                        <input type="text" id="selloLibro" data-auto-next="2" maxlength="2" value="" autocomplete="off"
+                        <input type="text" id="selloLibro" data-idx="2" maxlength="6" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
-                    <div>
-                        <label for="selloTomo" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">4. Tomo</label>
-                        <input type="text" id="selloTomo" maxlength="10" value="" autocomplete="off"
+                    <div class="relative">
+                        <div id="menuSelloTomo" class="hidden absolute bottom-full mb-1.5 left-0 z-40 min-w-[240px] max-h-56 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl py-1 text-left"></div>
+                        <div class="flex items-center justify-center gap-1 mb-1">
+                            <label for="selloTomo" class="text-[11px] font-bold text-gray-600 dark:text-gray-300" title="Escribe para filtrar, ↑/↓ para elegir, Tab/Enter para seleccionar o F2 para ver todo">4. Tomo</label>
+                            <button type="button" id="btnToggleMenuTomo" tabindex="-1" title="Ver catálogo de Tomos (F2)" class="text-[10px] px-1 rounded bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 hover:bg-sky-200">▾</button>
+                        </div>
+                        <input type="text" id="selloTomo" data-idx="3" maxlength="30" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloVol" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">5. Vol.</label>
-                        <input type="text" id="selloVol" data-auto-next="2" maxlength="2" value="" autocomplete="off"
+                        <input type="text" id="selloVol" data-idx="4" maxlength="3" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
-                    <div>
-                        <label for="selloFracc" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">6. Fracc.</label>
-                        <input type="text" id="selloFracc" maxlength="12" value="" autocomplete="off"
+                    <div class="relative">
+                        <div id="menuSelloFracc" class="hidden absolute bottom-full mb-1.5 left-0 z-40 min-w-[260px] max-h-56 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl py-1 text-left"></div>
+                        <div class="flex items-center justify-center gap-1 mb-1">
+                            <label for="selloFracc" class="text-[11px] font-bold text-gray-600 dark:text-gray-300" title="Escribe para filtrar, ↑/↓ para elegir, Tab/Enter para seleccionar o F2 para ver todo">6. Fracc.</label>
+                            <button type="button" id="btnToggleMenuFracc" tabindex="-1" title="Ver catálogo de Fraccionamiento (F2)" class="text-[10px] px-1 rounded bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 hover:bg-sky-200">▾</button>
+                        </div>
+                        <input type="text" id="selloFracc" data-idx="5" maxlength="55" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloAnio" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">7. Año</label>
-                        <input type="text" id="selloAnio" data-auto-next="4" maxlength="4" value="" autocomplete="off"
+                        <input type="text" id="selloAnio" data-idx="6" maxlength="4" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloInscr" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">8. Inscr.</label>
-                        <input type="text" id="selloInscr" maxlength="6" value="" autocomplete="off"
+                        <input type="text" id="selloInscr" data-idx="7" maxlength="4" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                     <div>
                         <label for="selloBis" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">9. Bis</label>
-                        <input type="text" id="selloBis" maxlength="2" value="" autocomplete="off"
+                        <input type="text" id="selloBis" data-idx="8" maxlength="3" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                 </div>
@@ -143,10 +151,12 @@
                         class="px-5 py-2.5 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow transition-colors">
                         <i class="fa-solid fa-check mr-1"></i> Renombrar
                     </button>
+                    {{-- Botón Duplicar comentado temporalmente
                     <button id="btnDuplicar"
                         class="px-4 py-2.5 text-sm font-bold bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow transition-colors">
                         <i class="fa-solid fa-copy mr-1"></i> Duplicar
                     </button>
+                    --}}
                     <button id="btnInconsistencia"
                         class="px-4 py-2.5 text-sm font-bold bg-amber-400 hover:bg-amber-500 text-black rounded-lg border border-amber-500 shadow transition-colors">
                         <i class="fa-solid fa-triangle-exclamation mr-1"></i> Inconsistencia
@@ -818,7 +828,7 @@
 
         // Registrar triggers de botones y acciones del flujo
         document.getElementById('btnRenombrar')?.addEventListener('click', () => CapturaProcesos.procesarRenombrar(ctx));
-        document.getElementById('btnDuplicar')?.addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
+        // document.getElementById('btnDuplicar')?.addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
         document.getElementById('btnLimpiar')?.addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
         document.getElementById('btnRefrescar')?.addEventListener('click', () => {
             const visor = document.getElementById("pdfViewer");
@@ -869,13 +879,15 @@
         document.getElementById('btnRotarIzquierda')?.addEventListener('click', () => confirmarYRotarPagina(-90));
         document.getElementById('btnRotarDerecha')?.addEventListener('click', () => confirmarYRotarPagina(90));
 
-        // Sincronizar los 9 campos segmentados de la Regla de Sellos con #txtNombre y flujo automático de input en input
+        // Replicación exacta del comportamiento de Form1.vb para los 9 campos de la Regla de Sellos
         (function initSegmentosSellos() {
             const ids = ['selloDel', 'selloSecc', 'selloLibro', 'selloTomo', 'selloVol', 'selloFracc', 'selloAnio', 'selloInscr', 'selloBis'];
             const campos = ids.map(id => document.getElementById(id)).filter(Boolean);
             const txtNombreEl = document.getElementById('txtNombre');
             const previewEl = document.getElementById('lblPreviewNombreSellos');
             if (!campos.length || !txtNombreEl) return;
+
+            let isDeleting = false;
 
             function construirNombreSellos() {
                 const valores = campos.map(c => (c.value || '').trim().toUpperCase());
@@ -886,30 +898,296 @@
                 txtNombreEl.dispatchEvent(new Event('input'));
             }
 
+            const menusCatalogo = {
+                3: document.getElementById('menuSelloTomo'),
+                5: document.getElementById('menuSelloFracc'),
+            };
+            const estadoMenu = {
+                3: { abierto: false, opciones: [], activo: 0 },
+                5: { abierto: false, opciones: [], activo: 0 },
+            };
+
+            function obtenerListaCatalogo(idx) {
+                if (idx === 3) return CapturaReglas.CATALOGO_TOMOS || [];
+                if (idx === 5) return CapturaReglas.CATALOGO_FRACCIONAMIENTO || [];
+                return [];
+            }
+
+            function filtrarOpcionesCatalogo(idx, valor, mostrarTodasSiVacio = false) {
+                const lista = obtenerListaCatalogo(idx);
+                const v = (valor || '').trim().toUpperCase();
+                if (!v || /^\d+$/.test(v)) {
+                    return mostrarTodasSiVacio ? lista.slice() : [];
+                }
+                const mNum = v.match(/^(\d+_)(.*)$/);
+                const prefNum = mNum ? mNum[1] : '';
+                const base = mNum ? mNum[2] : v;
+                if (!base) {
+                    return mostrarTodasSiVacio ? lista.map(p => prefNum + p) : [];
+                }
+                const empieza = lista.filter(p => p.startsWith(base));
+                const contiene = lista.filter(p => !p.startsWith(base) && p.includes(base));
+                return [...empieza, ...contiene].map(p => prefNum + p);
+            }
+
+            function cerrarMenuCatalogo(idx) {
+                const menu = menusCatalogo[idx];
+                const est = estadoMenu[idx];
+                if (!menu || !est) return;
+                est.abierto = false;
+                est.opciones = [];
+                est.activo = 0;
+                menu.classList.add('hidden');
+                menu.innerHTML = '';
+            }
+
+            function aplicarOpcionCatalogo(idx, opcion) {
+                const campo = campos[idx];
+                if (!campo || !opcion) return;
+                const maxLen = parseInt(campo.getAttribute('maxlength') || '55', 10);
+                campo.value = opcion.slice(0, maxLen);
+                cerrarMenuCatalogo(idx);
+                construirNombreSellos();
+                campos[idx + 1]?.focus();
+                campos[idx + 1]?.select();
+            }
+
+            function renderMenuCatalogo(idx, opciones) {
+                const menu = menusCatalogo[idx];
+                const est = estadoMenu[idx];
+                if (!menu || !est) return;
+                if (!opciones || opciones.length === 0) {
+                    cerrarMenuCatalogo(idx);
+                    return;
+                }
+                est.abierto = true;
+                est.opciones = opciones;
+                if (est.activo >= opciones.length || est.activo < 0) est.activo = 0;
+
+                menu.innerHTML = '';
+                const header = document.createElement('div');
+                header.className = 'px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700 flex justify-between';
+                header.innerHTML = `<span>${idx === 3 ? 'Catálogo Tomo' : 'Catálogo Fracc.'}</span><span>↑↓ · Tab/Enter</span>`;
+                menu.appendChild(header);
+
+                opciones.forEach((op, i) => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.dataset.optIdx = String(i);
+                    const activo = i === est.activo;
+                    item.className = 'w-full text-left px-2.5 py-1.5 text-xs font-mono font-bold transition-colors flex items-center justify-between ' +
+                        (activo
+                            ? 'bg-sky-600 text-white'
+                            : 'text-gray-800 dark:text-gray-100 hover:bg-sky-50 dark:hover:bg-gray-700');
+                    item.innerHTML = `<span>${op}</span>${activo ? '<span class="text-[10px] opacity-85 ml-2">Tab ↵</span>' : ''}`;
+                    item.addEventListener('mousedown', (ev) => {
+                        ev.preventDefault();
+                        aplicarOpcionCatalogo(idx, op);
+                    });
+                    item.addEventListener('mouseenter', () => {
+                        est.activo = i;
+                        actualizarResaltadoMenu(idx);
+                    });
+                    menu.appendChild(item);
+                });
+
+                menu.classList.remove('hidden');
+                const btnActivo = menu.querySelector(`button[data-opt-idx="${est.activo}"]`);
+                btnActivo?.scrollIntoView({ block: 'nearest' });
+            }
+
+            function actualizarResaltadoMenu(idx) {
+                const menu = menusCatalogo[idx];
+                const est = estadoMenu[idx];
+                if (!menu || !est || !est.abierto) return;
+                menu.querySelectorAll('button[data-opt-idx]').forEach((btn) => {
+                    const i = parseInt(btn.dataset.optIdx, 10);
+                    const activo = i === est.activo;
+                    btn.className = 'w-full text-left px-2.5 py-1.5 text-xs font-mono font-bold transition-colors flex items-center justify-between ' +
+                        (activo
+                            ? 'bg-sky-600 text-white'
+                            : 'text-gray-800 dark:text-gray-100 hover:bg-sky-50 dark:hover:bg-gray-700');
+                    btn.innerHTML = `<span>${est.opciones[i]}</span>${activo ? '<span class="text-[10px] opacity-85 ml-2">Tab ↵</span>' : ''}`;
+                    if (activo) btn.scrollIntoView({ block: 'nearest' });
+                });
+            }
+
+            function actualizarMenuCatalogo(idx, valor, mostrarTodasSiVacio = false) {
+                if (idx !== 3 && idx !== 5) return;
+                const opciones = filtrarOpcionesCatalogo(idx, valor, mostrarTodasSiVacio);
+                estadoMenu[idx].activo = 0;
+                renderMenuCatalogo(idx, opciones);
+            }
+
+            document.getElementById('btnToggleMenuTomo')?.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                if (estadoMenu[3].abierto) {
+                    cerrarMenuCatalogo(3);
+                } else {
+                    campos[3]?.focus();
+                    actualizarMenuCatalogo(3, campos[3]?.value || '', true);
+                }
+            });
+            document.getElementById('btnToggleMenuFracc')?.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                if (estadoMenu[5].abierto) {
+                    cerrarMenuCatalogo(5);
+                } else {
+                    campos[5]?.focus();
+                    actualizarMenuCatalogo(5, campos[5]?.value || '', true);
+                }
+            });
+
             campos.forEach((campo, idx) => {
                 campo.addEventListener('focus', () => campo.select());
 
+                // Filtrado interactivo de teclas idéntico a Form1.vb (TextBoxDinamico_KeyPress)
+                campo.addEventListener('beforeinput', (e) => {
+                    if (!e.data || e.inputType.startsWith('delete')) return;
+                    let ch = CapturaReglas.sanitizarTexto(e.data);
+                    if (ch === '') { e.preventDefault(); return; }
+
+                    const esTomoOFracc = (idx === 3 || idx === 5);
+                    const esBis = (idx === 8);
+
+                    if (esBis) {
+                        const start = campo.selectionStart ?? campo.value.length;
+                        const end = campo.selectionEnd ?? campo.value.length;
+                        const proyectado = (campo.value.slice(0, start) + ch + campo.value.slice(end)).toUpperCase();
+                        if (!'BIS'.startsWith(proyectado) && !/^\d{1,2}$/.test(proyectado)) {
+                            e.preventDefault();
+                        }
+                    } else if (esTomoOFracc) {
+                        const chNorm = ch.replace(/\s+/g, '_');
+                        if (!/^[A-ZÑ0-9_]+$/.test(chNorm)) {
+                            e.preventDefault();
+                            return;
+                        }
+                        if (idx === 3) {
+                            const start = campo.selectionStart ?? campo.value.length;
+                            const end = campo.selectionEnd ?? campo.value.length;
+                            const proyectado = (campo.value.slice(0, start) + chNorm + campo.value.slice(end)).toUpperCase();
+                            const base = CapturaReglas.extraerTextoBaseTomo(proyectado);
+                            if (base.startsWith('F')) {
+                                e.preventDefault();
+                                return;
+                            }
+                        }
+                    } else {
+                        // Bloques numéricos estándar (Del, Secc, Libro, Vol, Año, Inscr)
+                        if (!/^\d+$/.test(ch)) {
+                            e.preventDefault();
+                        }
+                    }
+                });
+
+                campo.addEventListener('blur', () => {
+                    if (idx === 3 || idx === 5) cerrarMenuCatalogo(idx);
+                });
+
                 campo.addEventListener('input', () => {
+                    let limpio = CapturaReglas.sanitizarTexto(campo.value);
+                    if (idx === 3 || idx === 5) {
+                        limpio = limpio.replace(/\s+/g, '_');
+                        actualizarMenuCatalogo(idx, limpio, false);
+                    }
+                    if (campo.value !== limpio) campo.value = limpio;
+
                     construirNombreSellos();
-                    const autoNext = parseInt(campo.dataset.autoNext || '0', 10);
-                    if (autoNext > 0 && campo.value.length >= autoNext && idx < campos.length - 1) {
+
+                    // Saltos automáticos idénticos a Form1.vb línea 5213
+                    const val = campo.value;
+                    const maxLen = parseInt(campo.getAttribute('maxlength') || '0', 10);
+                    const esSaltoDosDigitos = !isDeleting && (
+                        ((idx === 1 || idx === 3 || idx === 5) && /^\d{2}$/.test(val)) ||
+                        ((idx === 2 || idx === 4) && /^0\d$/.test(val))
+                    );
+
+                    if (((maxLen > 0 && val.length >= maxLen) || esSaltoDosDigitos) && idx < campos.length - 1) {
+                        if (idx === 3 || idx === 5) cerrarMenuCatalogo(idx);
                         campos[idx + 1].focus();
                         campos[idx + 1].select();
                     }
                 });
 
                 campo.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
+                    isDeleting = (e.key === 'Backspace' || e.key === 'Delete');
+
+                    // Manejo interactivo del menú desplegable de catálogo en Tomo (idx 3) y Fraccionamiento (idx 5)
+                    if (idx === 3 || idx === 5) {
+                        const est = estadoMenu[idx];
+
+                        if (e.key === 'F2' || e.key === 'F4') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (est.abierto) cerrarMenuCatalogo(idx);
+                            else actualizarMenuCatalogo(idx, campo.value, true);
+                            return;
+                        }
+
+                        if (est.abierto && est.opciones.length > 0) {
+                            if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                est.activo = (est.activo + 1) % est.opciones.length;
+                                actualizarResaltadoMenu(idx);
+                                return;
+                            }
+                            if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                est.activo = (est.activo - 1 + est.opciones.length) % est.opciones.length;
+                                actualizarResaltadoMenu(idx);
+                                return;
+                            }
+                            if ((e.key === 'Tab' && !e.shiftKey) || e.key === 'Enter') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                aplicarOpcionCatalogo(idx, est.opciones[est.activo]);
+                                return;
+                            }
+                            if (e.key === 'Escape') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                cerrarMenuCatalogo(idx);
+                                return;
+                            }
+                        } else if (e.key === 'ArrowDown') {
+                            // Abrir el catálogo completo con flecha abajo en Tomo / Fracc
+                            e.preventDefault();
+                            e.stopPropagation();
+                            actualizarMenuCatalogo(idx, campo.value, true);
+                            return;
+                        }
+                    }
+
+                    // Avanzar: Tab, +, Enter, ArrowDown, ArrowRight al final
+                    const avanza = (e.key === 'Tab' && !e.shiftKey) || e.key === '+' || e.key === 'Enter' || e.key === 'ArrowDown' ||
+                        (e.key === 'ArrowRight' && (campo.selectionStart >= campo.value.length || campo.selectionEnd - campo.selectionStart === campo.value.length));
+
+                    // Retroceder: Shift+Tab, ArrowUp, ArrowLeft al inicio, Backspace vacío
+                    const retrocede = (e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp' ||
+                        (e.key === 'ArrowLeft' && campo.selectionStart === 0) ||
+                        (e.key === 'Backspace' && campo.value === '');
+
+                    if (avanza) {
                         e.preventDefault();
+                        e.stopPropagation();
                         if (idx < campos.length - 1) {
                             campos[idx + 1].focus();
                             campos[idx + 1].select();
                         } else {
                             const btnRen = document.getElementById('btnRenombrar');
-                            if (btnRen && !btnRen.disabled) btnRen.click();
+                            if (btnRen && !btnRen.disabled) {
+                                if (e.key === 'Enter') btnRen.click();
+                                else btnRen.focus();
+                            } else {
+                                campos[0].focus();
+                            }
                         }
-                    } else if (e.key === 'Backspace' && campo.value === '' && idx > 0) {
+                    } else if (retrocede && idx > 0) {
                         e.preventDefault();
+                        e.stopPropagation();
                         campos[idx - 1].focus();
                         campos[idx - 1].select();
                     }
@@ -1129,11 +1407,15 @@
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
                         },
                         body: JSON.stringify({
-                            tipo_documento: ASIGNACION_USUARIO?.tipo_documento || 'registros',
+                            tipo_documento: ASIGNACION_USUARIO?.tipo_documento || 'sellos',
                             delegacion_id: delSeleccionada?.id || null,
+                            sesion_id: pdfActual?.sesion_id || (typeof ctx !== 'undefined' ? ctx.loteActualId : null),
+                            indice_pdf_id: pdfActual?.indice_pdf_id || null,
                             lote: (typeof ctx !== 'undefined' && ctx.loteActualNombre) ? ctx.loteActualNombre : 'LOTE',
-                            ruta_origen: pdfActual?.ruta || '',
+                            ruta_origen: pdfActual?.ruta_origen || '',
                             archivo_original: pdfActual?.nombre || '',
+                            paginas: pdfActual?.paginas || 1,
+                            hash: pdfActual?.hash || null,
                             inconsistencia_codigo: codigo,
                             inconsistencia_comentario: nota,
                         })
@@ -1148,8 +1430,8 @@
                 }
             });
 
-            // Iniciar búsqueda automática de lote inmediatamente
-            lblTotalPdf.innerText = del ? `${del.nombre} - Buscando lote automático...` : 'Buscando lote libre...';
+            // Iniciar búsqueda automática de PDF inmediatamente
+            lblTotalPdf.innerText = del ? `${del.nombre} - Buscando PDF...` : 'Buscando PDF libre...';
             CapturaProcesos.cargarLoteDesdeServidor(ctx);
         });
     </script>

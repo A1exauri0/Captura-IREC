@@ -5,48 +5,64 @@ namespace App\Services;
 class RutaPropuestaService
 {
     /**
-     * Calcula la ruta propuesta según el tipo de documento y acción, usando config/reglas_destino_pdf.php.
+     * Calcula la ruta propuesta manteniendo la misma ruta de entregables de `ruta_origen`,
+     * modificando la carpeta inmediata a partir de los segmentos hasta el año (inclusive)
+     * y manteniendo el nombre final propuesto del archivo.
+     *
+     * Ejemplo:
+     *   ruta_origen:    \\host\...\SELLOS\Villaflores\15_05_01_00_00_00_2001\15_05_01_00_00_00_2001_0023_00.pdf
+     *   archivo_nuevo:  15_05_01_00_00_00_2000_0023_00
+     *   ruta_propuesta: \\host\...\SELLOS\Villaflores\15_05_01_00_00_00_2000\15_05_01_00_00_00_2000_0023_00.pdf
      */
     public static function generar(string $tipoDocumento, array $datos, string $accion = 'renombrado'): string
     {
-        $tipo = strtolower(trim($tipoDocumento));
-        $reglas = config('reglas_destino_pdf.reglas', []);
-        $regla = $reglas[$tipo] ?? $reglas['registros'] ?? null;
+        $rutaOrigen = trim((string) ($datos['ruta_origen'] ?? ''));
+        $archivoNuevo = self::limpiarSegmento(
+            preg_replace('/\.pdf$/i', '', trim((string) ($datos['archivo_nuevo'] ?? $datos['archivo_original'] ?? 'SIN_NOMBRE')))
+        );
+        $archivoOriginal = self::limpiarSegmento(
+            preg_replace('/\.pdf$/i', '', trim((string) ($datos['archivo_original'] ?? $archivoNuevo)))
+        );
 
-        $base = rtrim((string) config('reglas_destino_pdf.base_destino', ''), '\\/');
-
-        $clavePlantilla = match (strtolower($accion)) {
-            'duplicar'       => 'carpeta_duplicado',
-            'inconsistencia' => 'carpeta_inconsistencia',
-            default          => 'plantilla',
-        };
-
-        $plantilla = $regla[$clavePlantilla] ?? '{base_destino}\\{tipo}\\{delegacion}\\{archivo_nuevo}.pdf';
-
-        $archivoNuevo    = preg_replace('/\.pdf$/i', '', trim((string) ($datos['archivo_nuevo'] ?? $datos['archivo_original'] ?? 'SIN_NOMBRE')));
-        $archivoOriginal = preg_replace('/\.pdf$/i', '', trim((string) ($datos['archivo_original'] ?? $archivoNuevo)));
-
-        // Extraer año de 4 dígitos si existe en el nombre del archivo
-        $anio = $datos['anio'] ?? null;
-        if (empty($anio) && preg_match('/\b(19\d{2}|20\d{2})\b/', $archivoNuevo, $m)) {
-            $anio = $m[1];
+        if ($rutaOrigen === '') {
+            return $archivoNuevo . '.pdf';
         }
-        $anio = $anio ?: date('Y');
 
-        $reemplazos = [
-            '{base_destino}'     => $base,
-            '{tipo}'             => strtoupper($tipo),
-            '{delegacion}'       => self::limpiarSegmento($datos['delegacion'] ?? 'GENERAL'),
-            '{tipo_sello}'       => self::limpiarSegmento($datos['tipo_sello'] ?? 'GENERAL'),
-            '{anio}'             => self::limpiarSegmento((string) $anio),
-            '{lote}'             => self::limpiarSegmento($datos['lote'] ?? 'LOTE_GENERAL'),
-            '{directorio}'       => self::limpiarSegmento($datos['directorio'] ?? 'GENERAL'),
-            '{codigo}'           => self::limpiarSegmento($datos['inconsistencia_codigo'] ?? 'R00'),
-            '{archivo_nuevo}'    => self::limpiarSegmento($archivoNuevo),
-            '{archivo_original}' => self::limpiarSegmento($archivoOriginal),
-        ];
+        // Si es inconsistencia, no se propone reubicación en entregables
+        if (strtolower($accion) === 'inconsistencia') {
+            return $rutaOrigen;
+        }
 
-        return str_replace(array_keys($reemplazos), array_values($reemplazos), $plantilla);
+        $usaBackslash = str_contains($rutaOrigen, '\\');
+        $sep = $usaBackslash ? '\\' : '/';
+        $esUnc = str_starts_with($rutaOrigen, '\\\\');
+
+        // Normalizar separadores a '/' para manipular directorios con precisión
+        $norm = str_replace('\\', '/', $rutaOrigen);
+        $ext = pathinfo($norm, PATHINFO_EXTENSION);
+        $ext = $ext !== '' ? $ext : 'pdf';
+
+        $carpetaActual = dirname($norm);           // ej: //172.../SELLOS/Villaflores/15_05_01_00_00_00_2001
+        $carpetaBase   = dirname($carpetaActual);  // ej: //172.../SELLOS/Villaflores
+        $nombreCarpetaActual = basename($carpetaActual);
+
+        // Construir nombre de carpeta usando desde el inicio hasta el año (4 dígitos: 18xx, 19xx, 20xx)
+        $carpetaNueva = $nombreCarpetaActual;
+        if (preg_match('/^(.*_(?:18|19|20)\d{2})(?:_|$)/', $archivoNuevo, $m)) {
+            $carpetaNueva = $m[1];
+        }
+
+        $rutaNorm = rtrim($carpetaBase, '/') . '/' . $carpetaNueva . '/' . $archivoNuevo . '.' . $ext;
+
+        if ($usaBackslash) {
+            $rutaFinal = str_replace('/', '\\', $rutaNorm);
+            if ($esUnc && !str_starts_with($rutaFinal, '\\\\')) {
+                $rutaFinal = '\\' . ltrim($rutaFinal, '\\');
+            }
+            return $rutaFinal;
+        }
+
+        return $rutaNorm;
     }
 
     private static function limpiarSegmento(string $valor): string

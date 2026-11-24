@@ -21,7 +21,12 @@ class StellumBridgeService
      */
     public function listarIndice(array $filtros = []): array
     {
+        if ($this->baseUrl === '' || !preg_match('#^https?://#i', $this->baseUrl)) {
+            return ['ok' => false, 'error' => 'STELLUM_BRIDGE_URL no configurada en .env', 'items' => []];
+        }
+
         try {
+            $filtros['bridge_token'] = $this->token;
             $response = Http::withToken($this->token)
                 ->timeout(20)
                 ->get($this->baseUrl . '/indice-pdfs', $filtros);
@@ -29,7 +34,9 @@ class StellumBridgeService
             if ($response->successful()) {
                 return $response->json() ?: ['ok' => false, 'items' => []];
             }
-            return ['ok' => false, 'status' => $response->status(), 'items' => []];
+            $jsonErr = $response->json();
+            $detalle = is_array($jsonErr) && !empty($jsonErr['error']) ? ': ' . $jsonErr['error'] : '';
+            return ['ok' => false, 'status' => $response->status(), 'error' => 'HTTP ' . $response->status() . $detalle, 'items' => []];
         } catch (\Throwable $e) {
             Log::warning('StellumBridgeService::listarIndice error: ' . $e->getMessage());
             return ['ok' => false, 'error' => $e->getMessage(), 'items' => []];
@@ -62,6 +69,18 @@ class StellumBridgeService
             Log::warning('StellumBridgeService::verificarExistencia error: ' . $e->getMessage());
             return ['ok' => false, 'existe' => false, 'coincidencia' => null, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Descarga el contenido binario del PDF desde Stellum para servirlo vía proxy (mismo origen, sin exponer token).
+     */
+    public function obtenerStreamPdf(int $indicePdfId)
+    {
+        return Http::withToken($this->token)
+            ->timeout(90)
+            ->get($this->baseUrl . '/indice-pdfs/' . $indicePdfId . '/stream', [
+                'bridge_token' => $this->token,
+            ]);
     }
 
     /**

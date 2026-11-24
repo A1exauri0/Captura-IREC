@@ -49,24 +49,24 @@
                         </div>
 
                         <div class="col-md-2 col-sm-6 mb-2">
-                            <label for="tipo_archivo" class="form-label font-weight-bold small mb-1">Tipo de Archivo:</label>
-                            <select id="tipo_archivo" name="tipo_archivo" class="form-control form-control-sm">
-                                <option value="">Todos los tipos</option>
-                                <option value="registros">Registros</option>
-                                <option value="sellos">Sellos y Boletas</option>
-                                <option value="notarias">Notarías</option>
-                                <option value="catastro">Catastro</option>
+                            <label for="estado_trabajo" class="form-label font-weight-bold small mb-1">Estado de Trabajo:</label>
+                            <select id="estado_trabajo" name="estado_trabajo" class="form-control form-control-sm">
+                                <option value="trabajados">Trabajados</option>
+                                <option value="pendientes">Pendientes (Sin trabajar)</option>
+                                <option value="en_captura">En captura (En curso)</option>
+                                <option value="todos">Todos (Stellum + Trabajados)</option>
                             </select>
                         </div>
 
                         <div class="col-md-2 col-sm-6 mb-2">
-                            <label for="fecha_inicio" class="form-label small mb-1">Desde:</label>
-                            <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control form-control-sm" value="{{ date('Y-m-01') }}">
-                        </div>
-
-                        <div class="col-md-2 col-sm-6 mb-2">
-                            <label for="fecha_fin" class="form-label small mb-1">Hasta:</label>
-                            <input type="date" id="fecha_fin" name="fecha_fin" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
+                            <label for="tipo_archivo" class="form-label font-weight-bold small mb-1">Tipo de Archivo:</label>
+                            <select id="tipo_archivo" name="tipo_archivo" class="form-control form-control-sm">
+                                <option value="sellos">Sellos y Boletas</option>
+                                <option value="">Todos los tipos</option>
+                                <option value="registros">Registros</option>
+                                <option value="notarias">Notarías</option>
+                                <option value="catastro">Catastro</option>
+                            </select>
                         </div>
 
                         <div class="col-md-2 col-sm-6 mb-2">
@@ -77,6 +77,16 @@
                                     <option value="{{ $del->id }}">{{ $del->nombre }}</option>
                                 @endforeach
                             </select>
+                        </div>
+
+                        <div class="col-md-1 col-sm-6 mb-2">
+                            <label for="fecha_inicio" class="form-label small mb-1">Desde:</label>
+                            <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control form-control-sm" value="{{ date('Y-m-01') }}">
+                        </div>
+
+                        <div class="col-md-1 col-sm-6 mb-2">
+                            <label for="fecha_fin" class="form-label small mb-1">Hasta:</label>
+                            <input type="date" id="fecha_fin" name="fecha_fin" class="form-control form-control-sm" value="{{ date('Y-m-d') }}">
                         </div>
 
                         <div class="col-md-1 col-sm-12 mb-2">
@@ -135,6 +145,7 @@
 $(document).ready(function() {
     function cargarBusqueda() {
         const busqueda = $('#inputBuscador').val().trim();
+        const estado_trabajo = $('#estado_trabajo').val();
         const tipo_archivo = $('#tipo_archivo').val();
         const fecha_inicio = $('#fecha_inicio').val();
         const fecha_fin = $('#fecha_fin').val();
@@ -143,7 +154,7 @@ $(document).ready(function() {
         $('#tbodyBusqueda').html(`
             <tr>
                 <td colspan="11" class="text-center py-4 text-muted">
-                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Buscando en Registros, Sellos, Notarías y Catastro...
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Buscando archivos (${estado_trabajo})...
                 </td>
             </tr>
         `);
@@ -154,6 +165,7 @@ $(document).ready(function() {
             data: {
                 _token: "{{ csrf_token() }}",
                 busqueda: busqueda,
+                estado_trabajo: estado_trabajo,
                 tipo_archivo: tipo_archivo,
                 fecha_inicio: fecha_inicio,
                 fecha_fin: fecha_fin,
@@ -178,10 +190,16 @@ $(document).ready(function() {
                 registros.forEach((row, idx) => {
                     const accionLower = (row.accion || '').toLowerCase();
                     let badgeAccion = `<span class="badge badge-otro">${(row.accion || 'OTRO').toUpperCase()}</span>`;
-                    if (accionLower.includes('renombrar') || accionLower.includes('renombrado')) {
-                        badgeAccion = `<span class="badge badge-renombrar">RENOMBRAR</span>`;
+                    if (accionLower === 'pendiente') {
+                        badgeAccion = `<span class="badge bg-slate-200 text-slate-700 border border-slate-300">PENDIENTE</span>`;
+                    } else if (accionLower === 'en_captura') {
+                        badgeAccion = `<span class="badge bg-blue-100 text-blue-800 border border-blue-300">EN CAPTURA</span>`;
+                    } else if (accionLower.includes('renombrar') || accionLower.includes('renombrado')) {
+                        badgeAccion = `<span class="badge badge-renombrar">RENOMBRADO</span>`;
                     } else if (accionLower.includes('validado') || accionLower.includes('validar')) {
                         badgeAccion = `<span class="badge badge-validado">VALIDADO</span>`;
+                    } else if (accionLower.includes('inconsistencia')) {
+                        badgeAccion = `<span class="badge badge-duplicar">INCONSISTENCIA</span>`;
                     } else if (accionLower.includes('duplicar') || accionLower.includes('duplicado')) {
                         badgeAccion = `<span class="badge badge-duplicar">DUPLICAR</span>`;
                     }
@@ -197,8 +215,9 @@ $(document).ready(function() {
                         : `<span class="badge bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check mr-1"></i>ÍNTEGRO</span>`;
 
                     const rutaOrig = row.ruta_origen ? `<div class="text-xs text-muted"><strong>Orig:</strong> ${row.ruta_origen}</div>` : '';
-                    const rutaDest = row.ruta_destino ? `<div class="text-xs text-slate-700"><strong>Dest:</strong> ${row.ruta_destino}</div>` : '';
-                    const hashInfo = row.hash ? `<div class="text-xs font-mono text-sky-700">SHA256: ${row.hash.substring(0, 16)}...</div>` : '';
+                    const rutaProp = row.ruta_propuesta ? `<div class="text-xs text-sky-700"><strong>Prop:</strong> ${row.ruta_propuesta}</div>` : '';
+                    const rutaDest = row.ruta_destino ? `<div class="text-xs text-emerald-700"><strong>Dest:</strong> ${row.ruta_destino}</div>` : '';
+                    const hashInfo = row.hash ? `<div class="text-xs font-mono text-slate-600">SHA256: ${row.hash.substring(0, 16)}...</div>` : '';
 
                     html += `
                         <tr>
@@ -206,7 +225,7 @@ $(document).ready(function() {
                             <td class="text-center">${badgeTipo}</td>
                             <td class="font-weight-bold text-dark">${row.archivo_original || '-'}</td>
                             <td class="text-primary font-weight-bold">${row.archivo_nuevo || '-'}</td>
-                            <td>${rutaOrig}${rutaDest}${hashInfo || '<span class="text-xs text-muted">-</span>'}</td>
+                            <td>${rutaOrig}${rutaProp}${rutaDest}${hashInfo || '<span class="text-xs text-muted">-</span>'}</td>
                             <td>
                                 <div class="font-weight-bold small">${row.delegacion_nombre || '-'}</div>
                                 <span class="badge bg-light text-dark border">${row.lote || 'N/A'}</span>
@@ -232,7 +251,7 @@ $(document).ready(function() {
             cargarBusqueda();
         }
     });
-    $('#tipo_archivo, #fecha_inicio, #fecha_fin, #delegacion_id').change(cargarBusqueda);
+    $('#estado_trabajo, #tipo_archivo, #fecha_inicio, #fecha_fin, #delegacion_id').change(cargarBusqueda);
     cargarBusqueda();
 });
 </script>

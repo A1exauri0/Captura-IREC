@@ -57,18 +57,18 @@ const CapturaArchivos = (() => {
     }
 
     /**
-     * Busca el primer lote libre en el disco y delegación indicados.
-     * El backend lo registra en la tabla lotes_captura con estado 'en_proceso'.
+     * Busca el siguiente archivo PDF libre en indice_archivos_pdfs (Stellum).
+     * El backend lo bloquea en archivos_sesiones con estado 'en_captura'.
      *
-     * @param {string} disco         - Identificador del disco (irec, cats, rciv).
+     * @param {string} disco         - Identificador del directorio/entrega.
      * @param {number} delegacionId  - ID de la delegación en la BD.
-     * @returns {Promise<{ ok, lote, archivos, rutaRelativa, mensaje }>}
+     * @returns {Promise<{ ok, lote, archivos, mensaje }>}
      */
-    async function buscarLote(disco, delegacionId) {
+    async function buscarPdf(disco, delegacionId) {
         const params = new URLSearchParams();
         if (disco) params.append('disco', disco);
         if (delegacionId) params.append('delegacion_id', delegacionId);
-        return getJSON(`/captura/buscar-lote?${params.toString()}`);
+        return getJSON(`/captura/buscar-pdf?${params.toString()}`);
     }
 
     /**
@@ -89,8 +89,13 @@ const CapturaArchivos = (() => {
      * @param {string} nuevoNombre   - Nuevo nombre sin extensión.
      * @returns {Promise<{ ok, rutaNueva, mensaje }>}
      */
-    async function renombrar(disco, rutaOriginal, nuevoNombre) {
-        return postJSON('/captura/renombrar', { disco, ruta_original: rutaOriginal, nuevo_nombre: nuevoNombre });
+    async function renombrar(disco, rutaOriginal, nuevoNombre, extra = {}) {
+        return postJSON('/captura/renombrar', {
+            disco,
+            ruta_original: rutaOriginal,
+            nuevo_nombre: nuevoNombre,
+            ...extra,
+        });
     }
 
     /**
@@ -120,9 +125,13 @@ const CapturaArchivos = (() => {
      * @param {string} nombreLote    - Nombre del lote actual.
      * @returns {Promise<{ ok, mensaje }>}
      */
-    async function validar(disco, rutaArchivo, delegacionId, nombreLote) {
+    async function validar(disco, rutaArchivo, delegacionId, nombreLote, extra = {}) {
         return postJSON('/captura/validar', {
-            disco, ruta_archivo: rutaArchivo, delegacion_id: delegacionId, nombre_lote: nombreLote,
+            disco,
+            ruta_archivo: rutaArchivo,
+            delegacion_id: delegacionId,
+            nombre_lote: nombreLote,
+            ...extra,
         });
     }
 
@@ -173,7 +182,7 @@ const CapturaArchivos = (() => {
 
     // API pública
     return {
-        buscarLote, urlVerPdf, renombrar, duplicar, validar,
+        buscarPdf, urlVerPdf, renombrar, duplicar, validar,
         moverInconsistencia, moverSellos, rotar, liberarLote,
     };
 })();
