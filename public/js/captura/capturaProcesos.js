@@ -284,7 +284,7 @@ const CapturaProcesos = (() => {
      */
     async function cargarLoteDesdeServidor(ctx) {
         if (!ctx.dirSeleccionado) {
-            ctx.dirSeleccionado = { id: 'irec', nombre: 'IREC', ruta: '\\\\172.40.5.84\\irec', reglas: ['Regla1'] };
+            ctx.dirSeleccionado = { id: 'irec', nombre: 'IREC', reglas: ['Regla2'] };
         }
 
         const delegacionId = ctx.delSeleccionada ? ctx.delSeleccionada.id : null;

@@ -1058,7 +1058,7 @@
             const ultimoDirId = localStorage.getItem('val_ultimo_directorio_id');
             const ultimaDelId = localStorage.getItem('val_ultima_delegacion_id');
 
-            let dir = directoriosConfig.find(d => d.id === ultimoDirId) || directoriosConfig[0] || { id: 'irec', nombre: 'IREC', ruta: '\\\\172.40.5.84\\irec', reglas: ['Regla1'] };
+            let dir = directoriosConfig.find(d => d.id === ultimoDirId) || directoriosConfig[0] || { id: 'irec', nombre: 'IREC', reglas: ['Regla2'] };
             let del = catalogoDelegaciones.find(d => String(d.id) === String(ultimaDelId)) || null;
 
             // Auto-seleccionar tipo de archivo, regla y delegación desde asignaciones_captura_usuario

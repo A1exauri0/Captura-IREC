@@ -4946,7 +4946,8 @@ class AuditoriaSellosController extends Controller
             } elseif (strcasecmp($delegacion, 'Ocosingo') === 0) {
                 $camposUpdate['ruta_nueva'] = $revision->ruta_actual;
             } elseif (strcasecmp($delegacion, 'Libros') === 0) {
-                $camposUpdate['ruta_nueva'] = "\\\\172.40.5.84\\irec\\LIBROS\\Ocosingo\\" . ($revision->archivo_nuevo ?: $revision->archivo_original);
+                $baseIrec = rtrim((string) config('captura_pdf.discos_stellum.irec', ''), '\\/');
+                $camposUpdate['ruta_nueva'] = ($baseIrec ? $baseIrec . '\\' : '') . "LIBROS\\Ocosingo\\" . ($revision->archivo_nuevo ?: $revision->archivo_original);
             } elseif (strcasecmp($delegacion, 'Inconsistencia') === 0 || strcasecmp($delegacion, 'Otra Delegacion') === 0 || strcasecmp($delegacion, 'No Existe') === 0) {
                 $camposUpdate['ruta_nueva'] = null;
             }
@@ -4976,7 +4977,8 @@ class AuditoriaSellosController extends Controller
             // 2. Si se mandó a Libros, actualizar únicamente el registro que coincida en cantidad de páginas
             elseif (strcasecmp($delegacion, 'Libros') === 0) {
                 $nombreArchivoLibros = !empty($revision->archivo_nuevo) ? $revision->archivo_nuevo : $revision->archivo_original;
-                $rutaDestinoLibros = "\\\\172.40.5.84\\irec\\LIBROS\\Ocosingo\\" . $nombreArchivoLibros;
+                $baseIrec = rtrim((string) config('captura_pdf.discos_stellum.irec', ''), '\\/');
+                $rutaDestinoLibros = ($baseIrec ? $baseIrec . '\\' : '') . "LIBROS\\Ocosingo\\" . $nombreArchivoLibros;
 
                 // Contar páginas físicas del archivo PDF (en destino o ruta actual)
                 $paginasPdf = $this->contarPaginasPdf($rutaDestinoLibros);

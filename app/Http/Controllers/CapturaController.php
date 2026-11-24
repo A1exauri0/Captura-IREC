@@ -491,7 +491,7 @@ class CapturaController extends Controller
             ? Storage::disk($disco)
             : Storage::build(['driver' => 'local', 'root' => $rutaConfigurada]);
 
-        // Obtener la ruta física completa (ej. \\172.40.5.84\irec\Respaldo_Original\...)
+        // Obtener la ruta física completa del disco configurado vía .env
         $rutaFisica = $storage->path($ruta);
 
         if (!file_exists($rutaFisica)) {

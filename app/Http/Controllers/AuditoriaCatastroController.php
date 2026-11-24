@@ -126,10 +126,11 @@ class AuditoriaCatastroController extends Controller
                     $rutaDestinoVal = $reg['rutadestino'] ?? $reg['ruta_destino'] ?? $reg['ruta'] ?? null;
 
                     // Fallback para ruta_origen si viene vacía
+                    $baseSsdcats = rtrim((string) config('captura_pdf.discos_stellum.ssdcats', ''), '\\/');
                     if (empty($rutaOrigenVal) && !empty($archivoOriginalVal)) {
                         $loteVal = $reg['lote'] ?? '';
-                        if ($loteVal) {
-                            $rutaOrigenVal = "\\\\172.40.5.84\\ssdcats\\LOTES_CATASTRO_CAPTURA\\{$loteVal}\\{$archivoOriginalVal}";
+                        if ($loteVal && $baseSsdcats !== '') {
+                            $rutaOrigenVal = "{$baseSsdcats}\\LOTES_CATASTRO_CAPTURA\\{$loteVal}\\{$archivoOriginalVal}";
                         }
                     }
 
@@ -141,9 +142,9 @@ class AuditoriaCatastroController extends Controller
                     // Normalizar y asegurar ruta_destino completa si viene vacía o incompleta
                     if (empty($rutaDestinoVal) || !preg_match('/^(\\\\\\\\|[A-Z]:)/i', $rutaDestinoVal)) {
                         $nombreDestino = $archivoNuevoVal ?: $archivoOriginalVal;
-                        if ($nombreDestino) {
+                        if ($nombreDestino && $baseSsdcats !== '') {
                             if (stripos((string)$accionVal, 'dañado') !== false || stripos((string)$accionVal, 'danado') !== false) {
-                                $rutaDestinoVal = "\\\\172.40.5.84\\ssdcats\\INCONSISTENCIAS_CATASTRO\\ARCHIVOS DAÑADOS\\{$nombreDestino}";
+                                $rutaDestinoVal = "{$baseSsdcats}\\INCONSISTENCIAS_CATASTRO\\ARCHIVOS DAÑADOS\\{$nombreDestino}";
                             } else {
                                 $baseDir = 'CALIDAD_CATASTRO';
                                 if (stripos((string)$accionVal, 'inconsistencia') !== false) {
@@ -167,25 +168,25 @@ class AuditoriaCatastroController extends Controller
                                 }
 
                                 if ($tipoDir && $munClave) {
-                                    $rutaDestinoVal = "\\\\172.40.5.84\\ssdcats\\{$baseDir}\\{$tipoDir}\\{$munClave}\\{$nombreDestino}";
+                                    $rutaDestinoVal = "{$baseSsdcats}\\{$baseDir}\\{$tipoDir}\\{$munClave}\\{$nombreDestino}";
                                 } elseif ($tipoDir) {
-                                    $rutaDestinoVal = "\\\\172.40.5.84\\ssdcats\\{$baseDir}\\{$tipoDir}\\{$nombreDestino}";
+                                    $rutaDestinoVal = "{$baseSsdcats}\\{$baseDir}\\{$tipoDir}\\{$nombreDestino}";
                                 } elseif ($munClave) {
-                                    $rutaDestinoVal = "\\\\172.40.5.84\\ssdcats\\{$baseDir}\\{$munClave}\\{$nombreDestino}";
+                                    $rutaDestinoVal = "{$baseSsdcats}\\{$baseDir}\\{$munClave}\\{$nombreDestino}";
                                 } else {
-                                    $rutaDestinoVal = "\\\\172.40.5.84\\ssdcats\\{$baseDir}\\{$nombreDestino}";
+                                    $rutaDestinoVal = "{$baseSsdcats}\\{$baseDir}\\{$nombreDestino}";
                                 }
                             }
                         }
                     }
 
                     // Asegurar subcarpeta SIN CLAVE CATASTRAL/{municipio}/ en CALIDAD_CATASTRO
-                    if ($rutaDestinoVal && stripos($rutaDestinoVal, 'CALIDAD_CATASTRO') !== false && stripos((string)$archivoNuevoVal, 'SIN_CLAVE_CATASTRAL') !== false) {
+                    if ($rutaDestinoVal && $baseSsdcats !== '' && stripos($rutaDestinoVal, 'CALIDAD_CATASTRO') !== false && stripos((string)$archivoNuevoVal, 'SIN_CLAVE_CATASTRAL') !== false) {
                         if ($detallesVal && preg_match('/(?:asignada\s*-\s*|Municipio\s*)(\d{3})/i', $detallesVal, $mMunDet)) {
                             $munClave = $mMunDet[1];
                             $rutaDeseada = "CALIDAD_CATASTRO\\SIN CLAVE CATASTRAL\\{$munClave}";
                             if (stripos($rutaDestinoVal, $rutaDeseada) === false) {
-                                $rutaDestinoVal = "\\\\172.40.5.84\\ssdcats\\{$rutaDeseada}\\{$archivoNuevoVal}";
+                                $rutaDestinoVal = "{$baseSsdcats}\\{$rutaDeseada}\\{$archivoNuevoVal}";
                             }
                         }
                     }

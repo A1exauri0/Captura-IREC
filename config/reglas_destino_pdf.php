@@ -21,7 +21,7 @@ return [
     |
     */
 
-    'base_destino' => env('PDF_DESTINO_BASE', '\\\\172.40.5.84\\ssdirec\\ENTREGABLES_APROBADOS'),
+    'base_destino' => env('PDF_DESTINO_BASE', ''),
 
     'reglas' => [
         'registros' => [

@@ -1,5 +1,8 @@
 <?php
 
+$pdfHost = trim((string) env('PDF_NETWORK_HOST', ''), '\\/');
+$uncPrefix = $pdfHost !== '' ? '\\\\' . $pdfHost : storage_path('app/pdf_network');
+
 return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
@@ -22,31 +25,31 @@ return [
 
         'irec' => [
             'driver' => 'local',
-            'root' => '\\\\172.40.5.84\\irec',
+            'root' => $uncPrefix . DIRECTORY_SEPARATOR . 'irec',
             'throw' => false,
         ],
 
         'ssdirec' => [
             'driver' => 'local',
-            'root' => '\\\\172.40.5.84\\ssdirec',
+            'root' => env('PDF_NETWORK_SERVER', $uncPrefix . DIRECTORY_SEPARATOR . 'ssdirec'),
             'throw' => false,
         ],
 
         'cats' => [
             'driver' => 'local',
-            'root' => '\\\\172.40.5.84\\cats',
+            'root' => $uncPrefix . DIRECTORY_SEPARATOR . 'cats',
             'throw' => false,
         ],
 
         'ssdcats' => [
             'driver' => 'local',
-            'root' => '\\\\172.40.5.84\\ssdcats',
+            'root' => $uncPrefix . DIRECTORY_SEPARATOR . 'ssdcats',
             'throw' => false,
         ],
 
         'rciv' => [
             'driver' => 'local',
-            'root' => '\\\\172.40.5.84\\rciv',
+            'root' => $uncPrefix . DIRECTORY_SEPARATOR . 'rciv',
             'throw' => false,
         ],
 

@@ -36,8 +36,8 @@ return [
     ],
 
     'stellum_bridge' => [
-        'url'   => env('STELLUM_BRIDGE_URL', 'https://app.astronmx.cloud/api/captura-bridge'),
-        'token' => env('STELLUM_BRIDGE_TOKEN', 'irec_stellum_bridge_2026_secret'),
+        'url'   => env('STELLUM_BRIDGE_URL', ''),
+        'token' => env('STELLUM_BRIDGE_TOKEN', ''),
     ],
 
 ];

@@ -13,7 +13,7 @@ class RutaPropuestaService
         $reglas = config('reglas_destino_pdf.reglas', []);
         $regla = $reglas[$tipo] ?? $reglas['registros'] ?? null;
 
-        $base = rtrim((string) config('reglas_destino_pdf.base_destino', '\\\\172.40.5.84\\ssdirec\\ENTREGABLES_APROBADOS'), '\\/');
+        $base = rtrim((string) config('reglas_destino_pdf.base_destino', ''), '\\/');
 
         $clavePlantilla = match (strtolower($accion)) {
             'duplicar'       => 'carpeta_duplicado',

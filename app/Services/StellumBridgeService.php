@@ -12,8 +12,8 @@ class StellumBridgeService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('services.stellum_bridge.url', 'https://app.astronmx.cloud/api/captura-bridge'), '/');
-        $this->token   = (string) config('services.stellum_bridge.token', 'irec_stellum_bridge_2026_secret');
+        $this->baseUrl = rtrim((string) config('services.stellum_bridge.url', ''), '/');
+        $this->token   = (string) config('services.stellum_bridge.token', '');
     }
 
     /**
