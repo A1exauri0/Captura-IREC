@@ -43,6 +43,21 @@ class InventarioEquiposController extends Controller
             ? PcCaptura::whereNotNull('no_serie')->where('no_serie', '!=', '')->get()->keyBy('no_serie')
             : collect();
 
+        // Ordenar equipos por Número de PC asignado (1, 2, 3... numéricamente); sin número al final
+        $equiposEntregados = $equiposEntregados->sort(function ($a, $b) use ($mapaPcsPorSerie) {
+            $pcA = $mapaPcsPorSerie->get($a['no_serie'] ?? '')?->numero_pc;
+            $pcB = $mapaPcsPorSerie->get($b['no_serie'] ?? '')?->numero_pc;
+            $tieneA = $pcA !== null && $pcA !== '';
+            $tieneB = $pcB !== null && $pcB !== '';
+
+            if ($tieneA && !$tieneB) return -1;
+            if (!$tieneA && $tieneB) return 1;
+            if ($tieneA && $tieneB) {
+                return strnatcasecmp((string) $pcA, (string) $pcB);
+            }
+            return 0;
+        })->values();
+
         return view('configuracion.inventario_equipos', compact(
             'usuarios',
             'equiposEntregados',
@@ -73,6 +88,16 @@ class InventarioEquiposController extends Controller
         $numeroPc = trim((string) preg_replace('/^PC[-\s]*/i', '', trim($data['numero_pc'])));
         if ($numeroPc === '') {
             return back()->with('error', 'Ingresa un número de PC válido.');
+        }
+
+        // Impedir repetir un Número de PC que ya pertenece a otro equipo
+        $ocupadoPorOtro = PcCaptura::where('numero_pc', $numeroPc)
+            ->whereNotNull('no_serie')
+            ->where('no_serie', '!=', '')
+            ->where('no_serie', '!=', $noSerie)
+            ->first();
+        if ($ocupadoPorOtro) {
+            return back()->with('error', "El número de PC {$numeroPc} ya está asignado al equipo {$ocupadoPorOtro->no_serie}. Elige otro número.");
         }
 
         $descripcion = trim(($data['tipo'] ?? 'PC') . ' ' . ($data['marca'] ?? ''));
