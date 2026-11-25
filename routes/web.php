@@ -43,7 +43,6 @@ Route::middleware(['auth'])->group(function () {
         // Estación de captura y validación de PDFs
         Route::name('admin.captura.')->group(function () {
             Route::get('/', [CapturaController::class, 'index'])->name('index');
-            Route::post('/seleccionar-pc', [CapturaController::class, 'seleccionarPc'])->name('seleccionarPc');
             Route::get('/buscar-pdf', [CapturaController::class, 'buscarPdf'])->name('buscarPdf');
             Route::post('/admin-siguiente', [CapturaController::class, 'adminSiguientePdf'])->name('adminSiguiente');
             Route::post('/admin-buscar-mismo-hash', [CapturaController::class, 'adminBuscarMismoHash'])->name('adminBuscarMismoHash');

@@ -119,10 +119,6 @@ class CapturaController extends Controller
             : null;
         $estadoHorario = $this->evaluarHorarioUsuario($usuario, true, $sesionActivaUsuario);
         $pcSeleccionada = $this->obtenerPcActual($request, $usuario);
-        $pcsDisponibles = \Illuminate\Support\Facades\Schema::hasTable('pcs_captura')
-            ? \App\Models\PcCaptura::where('activo', true)->orderBy('numero_pc')->get(['id', 'numero_pc', 'ubicacion', 'no_serie'])
-            : collect();
-        $requiereSeleccionPc = empty($request->session()->get('pc_seleccionada')) && $pcsDisponibles->isNotEmpty();
         $servidorTimestampMs = now()->timestamp * 1000;
         $servidorZonaHoraria = config('app.timezone', 'America/Mexico_City');
         $anios = Anio::where('estatus', 1)->pluck('nombre')->toArray();
@@ -183,36 +179,9 @@ class CapturaController extends Controller
             'catalogoInconsistencias',
             'estadoHorario',
             'pcSeleccionada',
-            'pcsDisponibles',
-            'requiereSeleccionPc',
             'servidorTimestampMs',
             'servidorZonaHoraria'
         ));
-    }
-
-    /**
-     * Guarda en sesión el número de PC seleccionado desde el modal de la estación de captura.
-     */
-    public function seleccionarPc(Request $request)
-    {
-        $data = $request->validate([
-            'numero_pc' => 'required|string|max:30|exists:pcs_captura,numero_pc',
-        ]);
-
-        $numeroPc = strtoupper(trim($data['numero_pc']));
-        $request->session()->put('pc_seleccionada', $numeroPc);
-
-        // Si el usuario ya tenía una sesión en_captura, actualizarle el campo pc
-        if (Auth::id()) {
-            ArchivoSesion::where('user_id', Auth::id())
-                ->where('estado', 'en_captura')
-                ->update(['pc' => $numeroPc]);
-        }
-
-        return response()->json([
-            'ok'        => true,
-            'numero_pc' => $numeroPc,
-        ]);
     }
 
     /**

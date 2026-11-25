@@ -43,43 +43,6 @@
         </div>
     </div>
 
-    <!-- Modal obligatorio de selección de Número de PC al entrar a la Estación de Captura -->
-    <div id="modalSeleccionPc" class="hidden fixed inset-0 z-[95] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div class="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
-                <div class="w-11 h-11 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-computer"></i>
-                </div>
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">Selecciona tu Número de PC</h2>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Indica en qué equipo vas a capturar durante esta sesión.</p>
-                </div>
-            </div>
-            <div>
-                <label for="selectNumeroPcModal" class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1.5">Número de PC *</label>
-                <select id="selectNumeroPcModal" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:border-sky-600 focus:outline-none">
-                    <option value="">-- Selecciona tu PC --</option>
-                    @foreach(($pcsDisponibles ?? []) as $pc)
-                        <option value="{{ $pc->numero_pc }}">
-                            {{ $pc->numero_pc }}{{ $pc->ubicacion ? ' — ' . $pc->ubicacion : '' }}{{ $pc->no_serie ? ' (SN: ' . $pc->no_serie . ')' : '' }}
-                        </option>
-                    @endforeach
-                </select>
-                <p id="lblErrorPcModal" class="hidden text-xs text-rose-600 font-semibold mt-1.5"></p>
-            </div>
-            <div class="flex justify-end gap-2 pt-1">
-                <button type="button" onclick="document.getElementById('logout-form').submit();"
-                    class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-bold">
-                    Salir
-                </button>
-                <button type="button" id="btnConfirmarPcModal"
-                    class="px-5 py-2 rounded-lg bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center gap-1.5">
-                    <i class="fa-solid fa-check"></i> Confirmar PC y Comenzar
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Bloqueo por horario laboral (controlado por servidor y frontend) -->
     <div id="overlayBloqueoHorario" class="hidden fixed inset-0 z-[90] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-6">
         <div class="max-w-md w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center shadow-2xl space-y-4">
@@ -1611,7 +1574,6 @@
         const ASIGNACION_USUARIO = @json($asignacionUsuario ?? null);
         const CATALOGO_INCONSISTENCIAS = @json($catalogoInconsistencias ?? []);
         const ESTADO_HORARIO = @json($estadoHorario ?? ['permitido' => true, 'en_horario' => true, 'mensaje' => null]);
-        const REQUIERE_SELECCION_PC = @json((bool) ($requiereSeleccionPc ?? false));
         const SERVIDOR_TZ = @json($servidorZonaHoraria ?? 'America/Mexico_City');
         const SERVIDOR_OFFSET_MS = {{ (int) ($servidorTimestampMs ?? (now()->timestamp * 1000)) }} - Date.now();
 
@@ -1814,63 +1776,9 @@
                 return;
             }
 
-            const iniciarCapturaAutomatica = () => {
-                lblTotalPdf.innerText = del ? `${del.nombre} - Buscando PDF...` : 'Buscando PDF libre...';
-                CapturaProcesos.cargarLoteDesdeServidor(ctx);
-            };
-
-            // Si aún no ha seleccionado número de PC en esta sesión, mostrar modal obligatorio antes de cargar PDFs
-            if (REQUIERE_SELECCION_PC) {
-                const modalPc = document.getElementById('modalSeleccionPc');
-                const selPc = document.getElementById('selectNumeroPcModal');
-                const btnPc = document.getElementById('btnConfirmarPcModal');
-                const errPc = document.getElementById('lblErrorPcModal');
-                if (modalPc && selPc && btnPc) {
-                    const ultimaPc = localStorage.getItem('val_ultima_pc_seleccionada');
-                    if (ultimaPc) selPc.value = ultimaPc;
-                    modalPc.classList.remove('hidden');
-                    selPc.focus();
-
-                    btnPc.addEventListener('click', async () => {
-                        const numeroPc = (selPc.value || '').trim();
-                        if (!numeroPc) {
-                            if (errPc) {
-                                errPc.textContent = 'Debes seleccionar un número de PC para continuar.';
-                                errPc.classList.remove('hidden');
-                            }
-                            return;
-                        }
-                        if (errPc) errPc.classList.add('hidden');
-                        btnPc.disabled = true;
-                        try {
-                            const r = await fetch("{{ route('admin.captura.seleccionarPc') }}", {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                                },
-                                body: JSON.stringify({ numero_pc: numeroPc })
-                            });
-                            const d = await r.json();
-                            if (!r.ok || !d.ok) throw new Error(d.message || 'No se pudo guardar el número de PC.');
-                            localStorage.setItem('val_ultima_pc_seleccionada', numeroPc);
-                            modalPc.classList.add('hidden');
-                            iniciarCapturaAutomatica();
-                        } catch (e) {
-                            if (errPc) {
-                                errPc.textContent = e.message;
-                                errPc.classList.remove('hidden');
-                            }
-                            btnPc.disabled = false;
-                        }
-                    });
-                    return;
-                }
-            }
-
             // Iniciar búsqueda automática de PDF inmediatamente
-            iniciarCapturaAutomatica();
+            lblTotalPdf.innerText = del ? `${del.nombre} - Buscando PDF...` : 'Buscando PDF libre...';
+            CapturaProcesos.cargarLoteDesdeServidor(ctx);
         });
     </script>
 
