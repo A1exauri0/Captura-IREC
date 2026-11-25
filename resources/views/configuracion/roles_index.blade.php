@@ -82,40 +82,6 @@
                                         @endif
                                     </td>
                                 </tr>
-
-                                <div class="modal fade" id="modalEditarRol{{ $rol->id }}" tabindex="-1" role="dialog">
-                                    <div class="modal-dialog" role="document">
-                                        <form action="{{ route('admin.roles.update', $rol->id) }}" method="POST" class="modal-content border-0 shadow-lg">
-                                            @csrf
-                                            @method('PUT')
-                                            <div class="modal-header bg-slate-900 text-white">
-                                                <h5 class="modal-title text-base font-weight-bold">Editar Rol: {{ $rol->name }}</h5>
-                                                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="form-group">
-                                                    <label class="text-xs font-weight-bold">Nombre</label>
-                                                    <input type="text" name="name" class="form-control" value="{{ $rol->name }}" required>
-                                                </div>
-                                                <div class="form-group mb-0">
-                                                    <label class="text-xs font-weight-bold d-block">Permisos</label>
-                                                    <div class="p-2 bg-slate-50 rounded border" style="max-height: 220px; overflow-y: auto;">
-                                                        @foreach($permisos as $p)
-                                                            <label class="d-flex align-items-center mb-1.5 text-sm" style="gap: 8px;">
-                                                                <input type="checkbox" name="permissions[]" value="{{ $p->name }}" {{ $rol->hasPermissionTo($p->name) ? 'checked' : '' }}>
-                                                                <span>{{ $p->name }}</span>
-                                                            </label>
-                                                        @endforeach
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer bg-light">
-                                                <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
-                                                <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Actualizar</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
                             @endforeach
                         </tbody>
                     </table>
@@ -123,4 +89,41 @@
             </div>
         </div>
     </div>
+
+    <!-- Modales Editar Rol (fuera de <table>) -->
+    @foreach($roles as $rol)
+        <div class="modal fade" id="modalEditarRol{{ $rol->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <form action="{{ route('admin.roles.update', $rol->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header bg-slate-900 text-white">
+                        <h5 class="modal-title text-base font-weight-bold">Editar Rol: {{ $rol->name }}</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body bg-white">
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Nombre</label>
+                            <input type="text" name="name" class="form-control" value="{{ $rol->name }}" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="text-xs font-weight-bold d-block">Permisos</label>
+                            <div class="p-2 bg-slate-50 rounded border" style="max-height: 220px; overflow-y: auto;">
+                                @foreach($permisos as $p)
+                                    <label class="d-flex align-items-center mb-1.5 text-sm" style="gap: 8px;">
+                                        <input type="checkbox" name="permissions[]" value="{{ $p->name }}" {{ $rol->hasPermissionTo($p->name) ? 'checked' : '' }}>
+                                        <span>{{ $p->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Actualizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
 @endsection

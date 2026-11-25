@@ -95,77 +95,80 @@
                                 @endif
                             </td>
                         </tr>
-
-                        <div class="modal fade" id="modalEditarUsuario{{ $u->id }}" tabindex="-1" role="dialog">
-                            <div class="modal-dialog modal-lg" role="document">
-                                <form action="{{ route('admin.usuarios.update', $u->id) }}" method="POST" class="modal-content border-0 shadow-lg">
-                                    @csrf
-                                    @method('PUT')
-                                    <div class="modal-header bg-slate-900 text-white">
-                                        <h5 class="modal-title text-base font-weight-bold">Editar Usuario: {{ $u->name }}</h5>
-                                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="row">
-                                            <div class="col-md-6 form-group">
-                                                <label class="text-xs font-weight-bold">Nombre Completo</label>
-                                                <input type="text" name="name" class="form-control" value="{{ $u->name }}" required>
-                                            </div>
-                                            <div class="col-md-6 form-group">
-                                                <label class="text-xs font-weight-bold">Usuario (Login)</label>
-                                                <input type="text" name="user" class="form-control" value="{{ $u->user }}" required>
-                                            </div>
-                                            <div class="col-md-6 form-group">
-                                                <label class="text-xs font-weight-bold">Correo Electrónico</label>
-                                                <input type="email" name="email" class="form-control" value="{{ $u->email }}" required>
-                                            </div>
-                                            <div class="col-md-6 form-group">
-                                                <label class="text-xs font-weight-bold">Nueva Contraseña (opcional)</label>
-                                                <input type="password" name="password" class="form-control" placeholder="Dejar vacío para mantener">
-                                            </div>
-                                            <div class="col-md-6 form-group">
-                                                <label class="text-xs font-weight-bold">Turno Asignado</label>
-                                                <select name="turno_id" class="form-control">
-                                                    <option value="">-- Sin turno específico --</option>
-                                                    @foreach($turnos as $t)
-                                                        <option value="{{ $t->id }}" {{ $u->turno_id == $t->id ? 'selected' : '' }}>
-                                                            {{ $t->nombre }} ({{ substr($t->hora_entrada, 0, 5) }} - {{ substr($t->hora_salida, 0, 5) }})
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6 form-group">
-                                                <label class="text-xs font-weight-bold">Estado</label>
-                                                <select name="estatus" class="form-control">
-                                                    <option value="1" {{ $u->estatus ? 'selected' : '' }}>Activo</option>
-                                                    <option value="0" {{ !$u->estatus ? 'selected' : '' }}>Inactivo</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-12 form-group mb-0">
-                                                <label class="text-xs font-weight-bold d-block">Roles Asignados</label>
-                                                <div class="d-flex flex-wrap p-2 bg-slate-50 rounded border" style="gap: 12px;">
-                                                    @foreach($roles as $rol)
-                                                        <label class="mb-0 d-flex align-items-center text-sm" style="gap: 6px;">
-                                                            <input type="checkbox" name="roles[]" value="{{ $rol->name }}" {{ $u->hasRole($rol->name) ? 'checked' : '' }}>
-                                                            <span>{{ $rol->name }}</span>
-                                                        </label>
-                                                    @endforeach
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer bg-light">
-                                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar Cambios</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
                     @endforeach
                 </tbody>
             </table>
         </div>
     </div>
+
+    <!-- Modales Editar Usuario (fuera de <table> para renderizado correcto) -->
+    @foreach($usuarios as $u)
+        <div class="modal fade" id="modalEditarUsuario{{ $u->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-lg" role="document">
+                <form action="{{ route('admin.usuarios.update', $u->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header bg-slate-900 text-white">
+                        <h5 class="modal-title text-base font-weight-bold">Editar Usuario: {{ $u->name }}</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body bg-white">
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label class="text-xs font-weight-bold">Nombre Completo</label>
+                                <input type="text" name="name" class="form-control" value="{{ $u->name }}" required>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="text-xs font-weight-bold">Usuario (Login)</label>
+                                <input type="text" name="user" class="form-control" value="{{ $u->user }}" required>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="text-xs font-weight-bold">Correo Electrónico</label>
+                                <input type="email" name="email" class="form-control" value="{{ $u->email }}" required>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="text-xs font-weight-bold">Nueva Contraseña (opcional)</label>
+                                <input type="password" name="password" class="form-control" placeholder="Dejar vacío para mantener">
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="text-xs font-weight-bold">Turno Asignado</label>
+                                <select name="turno_id" class="form-control">
+                                    <option value="">-- Sin turno específico --</option>
+                                    @foreach($turnos as $t)
+                                        <option value="{{ $t->id }}" {{ $u->turno_id == $t->id ? 'selected' : '' }}>
+                                            {{ $t->nombre }} ({{ substr($t->hora_entrada, 0, 5) }} - {{ substr($t->hora_salida, 0, 5) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="text-xs font-weight-bold">Estado</label>
+                                <select name="estatus" class="form-control">
+                                    <option value="1" {{ $u->estatus ? 'selected' : '' }}>Activo</option>
+                                    <option value="0" {{ !$u->estatus ? 'selected' : '' }}>Inactivo</option>
+                                </select>
+                            </div>
+                            <div class="col-12 form-group mb-0">
+                                <label class="text-xs font-weight-bold d-block">Roles Asignados</label>
+                                <div class="d-flex flex-wrap p-2 bg-slate-50 rounded border" style="gap: 12px;">
+                                    @foreach($roles as $rol)
+                                        <label class="mb-0 d-flex align-items-center text-sm" style="gap: 6px;">
+                                            <input type="checkbox" name="roles[]" value="{{ $rol->name }}" {{ $u->hasRole($rol->name) ? 'checked' : '' }}>
+                                            <span>{{ $rol->name }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
 
     <!-- Modal Crear Usuario -->
     <div class="modal fade" id="modalCrearUsuario" tabindex="-1" role="dialog">

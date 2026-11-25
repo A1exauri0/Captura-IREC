@@ -60,6 +60,18 @@
 .sidebar-scroll-thumb.is-visible {
     opacity: 1;
 }
+
+/* Garantizar que modales Bootstrap siempre pinten sólidos encima del backdrop */
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+.modal {
+    z-index: 1060 !important;
+}
+.modal-content {
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+}
 .sidebar-scroll-thumb.is-visible {
     background: rgba(56, 189, 248, 0.55);
 }

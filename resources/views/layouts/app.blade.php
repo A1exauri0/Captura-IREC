@@ -198,6 +198,13 @@
                 });
             }
 
+            // Garantizar que cualquier modal Bootstrap se monte directamente en <body> sobre el backdrop
+            if (typeof $ !== 'undefined') {
+                $(document).on('show.bs.modal', '.modal', function () {
+                    $(this).appendTo('body');
+                });
+            }
+
             // Inicializar Laravel Echo conectado a Laravel Reverb solo si BROADCAST_CONNECTION=reverb
             const reverbActivo = {{ config('broadcasting.default') === 'reverb' ? 'true' : 'false' }};
             if (reverbActivo && typeof Pusher !== 'undefined' && typeof Echo !== 'undefined') {

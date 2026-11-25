@@ -61,49 +61,52 @@
                                 </form>
                             </td>
                         </tr>
-
-                        <div class="modal fade" id="modalEditarInc{{ $item->id }}" tabindex="-1" role="dialog">
-                            <div class="modal-dialog" role="document">
-                                <form action="{{ route('admin.catalogo_inconsistencias.update', $item->id) }}" method="POST" class="modal-content border-0 shadow-lg">
-                                    @csrf
-                                    @method('PUT')
-                                    <div class="modal-header bg-slate-900 text-white">
-                                        <h5 class="modal-title text-base font-weight-bold">Editar Código {{ $item->codigo }}</h5>
-                                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="form-group">
-                                            <label class="text-xs font-weight-bold">Código</label>
-                                            <input type="text" name="codigo" class="form-control font-mono" value="{{ $item->codigo }}" required maxlength="10">
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="text-xs font-weight-bold">Motivo de Rechazo</label>
-                                            <input type="text" name="motivo_rechazo" class="form-control" value="{{ $item->motivo_rechazo }}" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="text-xs font-weight-bold">Acción Correctiva</label>
-                                            <input type="text" name="accion_correctiva" class="form-control" value="{{ $item->accion_correctiva }}" required>
-                                        </div>
-                                        <div class="form-group mb-0">
-                                            <label class="text-xs font-weight-bold">Estado</label>
-                                            <select name="activo" class="form-control">
-                                                <option value="1" {{ $item->activo ? 'selected' : '' }}>Activo</option>
-                                                <option value="0" {{ !$item->activo ? 'selected' : '' }}>Inactivo</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer bg-light">
-                                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
                     @endforeach
                 </tbody>
             </table>
         </div>
     </div>
+
+    <!-- Modales Editar Código (fuera de <table>) -->
+    @foreach($catalogo as $item)
+        <div class="modal fade" id="modalEditarInc{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <form action="{{ route('admin.catalogo_inconsistencias.update', $item->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header bg-slate-900 text-white">
+                        <h5 class="modal-title text-base font-weight-bold">Editar Código {{ $item->codigo }}</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body bg-white">
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Código</label>
+                            <input type="text" name="codigo" class="form-control font-mono" value="{{ $item->codigo }}" required maxlength="10">
+                        </div>
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Motivo de Rechazo</label>
+                            <input type="text" name="motivo_rechazo" class="form-control" value="{{ $item->motivo_rechazo }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Acción Correctiva</label>
+                            <input type="text" name="accion_correctiva" class="form-control" value="{{ $item->accion_correctiva }}" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="text-xs font-weight-bold">Estado</label>
+                            <select name="activo" class="form-control">
+                                <option value="1" {{ $item->activo ? 'selected' : '' }}>Activo</option>
+                                <option value="0" {{ !$item->activo ? 'selected' : '' }}>Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
 
     <!-- Modal Crear -->
     <div class="modal fade" id="modalCrearInconsistencia" tabindex="-1" role="dialog">

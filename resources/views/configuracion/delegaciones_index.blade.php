@@ -64,49 +64,52 @@
                                 </form>
                             </td>
                         </tr>
-
-                        <div class="modal fade" id="modalEditarDelegacion{{ $d->id }}" tabindex="-1" role="dialog">
-                            <div class="modal-dialog" role="document">
-                                <form action="{{ route('admin.delegaciones.update', $d->id) }}" method="POST" class="modal-content border-0 shadow-lg">
-                                    @csrf
-                                    @method('PUT')
-                                    <div class="modal-header bg-slate-900 text-white">
-                                        <h5 class="modal-title text-base font-weight-bold">Editar Delegación</h5>
-                                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="form-group">
-                                            <label class="text-xs font-weight-bold">Clave</label>
-                                            <input type="text" name="clave" class="form-control" value="{{ $d->clave }}" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="text-xs font-weight-bold">Nombre</label>
-                                            <input type="text" name="nombre" class="form-control" value="{{ $d->nombre }}" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="text-xs font-weight-bold">Nota (opcional)</label>
-                                            <input type="text" name="nota" class="form-control" value="{{ $d->nota }}">
-                                        </div>
-                                        <div class="form-group mb-0">
-                                            <label class="text-xs font-weight-bold">Estado</label>
-                                            <select name="estatus" class="form-control">
-                                                <option value="1" {{ $d->estatus ? 'selected' : '' }}>Activa</option>
-                                                <option value="0" {{ !$d->estatus ? 'selected' : '' }}>Inactiva</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer bg-light">
-                                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
-                                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
                     @endforeach
                 </tbody>
             </table>
         </div>
     </div>
+
+    <!-- Modales Editar Delegación (fuera de <table>) -->
+    @foreach($delegaciones as $d)
+        <div class="modal fade" id="modalEditarDelegacion{{ $d->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <form action="{{ route('admin.delegaciones.update', $d->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header bg-slate-900 text-white">
+                        <h5 class="modal-title text-base font-weight-bold">Editar Delegación</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body bg-white">
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Clave</label>
+                            <input type="text" name="clave" class="form-control" value="{{ $d->clave }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Nombre</label>
+                            <input type="text" name="nombre" class="form-control" value="{{ $d->nombre }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Nota (opcional)</label>
+                            <input type="text" name="nota" class="form-control" value="{{ $d->nota }}">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="text-xs font-weight-bold">Estado</label>
+                            <select name="estatus" class="form-control">
+                                <option value="1" {{ $d->estatus ? 'selected' : '' }}>Activa</option>
+                                <option value="0" {{ !$d->estatus ? 'selected' : '' }}>Inactiva</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
 
     <!-- Modal Crear Delegación -->
     <div class="modal fade" id="modalCrearDelegacion" tabindex="-1" role="dialog">

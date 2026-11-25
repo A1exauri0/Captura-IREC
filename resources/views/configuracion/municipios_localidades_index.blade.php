@@ -68,37 +68,6 @@
                                         </form>
                                     </td>
                                 </tr>
-
-                                <div class="modal fade" id="modalEditarMunicipio{{ $m->id }}" tabindex="-1" role="dialog">
-                                    <div class="modal-dialog" role="document">
-                                        <form action="{{ route('admin.municipios.update', $m->id) }}" method="POST" class="modal-content border-0 shadow-lg">
-                                            @csrf
-                                            @method('PUT')
-                                            <div class="modal-header bg-slate-900 text-white">
-                                                <h5 class="modal-title text-base font-weight-bold">Editar Municipio</h5>
-                                                <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="form-group">
-                                                    <label class="text-xs font-weight-bold">Clave</label>
-                                                    <input type="text" name="clave" class="form-control" value="{{ $m->clave }}" required>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="text-xs font-weight-bold">Nombre</label>
-                                                    <input type="text" name="nombre" class="form-control" value="{{ $m->nombre }}" required>
-                                                </div>
-                                                <div class="form-group mb-0">
-                                                    <label class="text-xs font-weight-bold">Clave Estado</label>
-                                                    <input type="text" name="estado" class="form-control" value="{{ $m->estado }}">
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer bg-light">
-                                                <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
-                                                <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
                             @endforeach
                         </tbody>
                     </table>
@@ -153,33 +122,6 @@
                                             </form>
                                         </td>
                                     </tr>
-
-                                    <div class="modal fade" id="modalEditarLoc{{ $loc->id }}" tabindex="-1" role="dialog">
-                                        <div class="modal-dialog" role="document">
-                                            <form action="{{ route('admin.localidades.update', $loc->id) }}" method="POST" class="modal-content border-0 shadow-lg">
-                                                @csrf
-                                                @method('PUT')
-                                                <div class="modal-header bg-slate-900 text-white">
-                                                    <h5 class="modal-title text-base font-weight-bold">Editar Localidad</h5>
-                                                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <div class="form-group">
-                                                        <label class="text-xs font-weight-bold">Clave</label>
-                                                        <input type="text" name="clave" class="form-control" value="{{ $loc->clave }}" required>
-                                                    </div>
-                                                    <div class="form-group mb-0">
-                                                        <label class="text-xs font-weight-bold">Nombre</label>
-                                                        <input type="text" name="nombre" class="form-control" value="{{ $loc->nombre }}" required>
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer bg-light">
-                                                    <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
-                                                    <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
                                 @empty
                                     <tr>
                                         <td colspan="3" class="text-center py-4 text-muted">Sin localidades registradas para este criterio.</td>
@@ -202,6 +144,72 @@
             </div>
         </div>
     </div>
+
+    <!-- Modales Editar Municipio (fuera de <table>) -->
+    @foreach($municipios as $m)
+        <div class="modal fade" id="modalEditarMunicipio{{ $m->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <form action="{{ route('admin.municipios.update', $m->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header bg-slate-900 text-white">
+                        <h5 class="modal-title text-base font-weight-bold">Editar Municipio</h5>
+                        <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                    </div>
+                    <div class="modal-body bg-white">
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Clave</label>
+                            <input type="text" name="clave" class="form-control" value="{{ $m->clave }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="text-xs font-weight-bold">Nombre</label>
+                            <input type="text" name="nombre" class="form-control" value="{{ $m->nombre }}" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="text-xs font-weight-bold">Clave Estado</label>
+                            <input type="text" name="estado" class="form-control" value="{{ $m->estado }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endforeach
+
+    @if($municipioActual)
+        <!-- Modales Editar Localidad (fuera de <table>) -->
+        @foreach($localidades as $loc)
+            <div class="modal fade" id="modalEditarLoc{{ $loc->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <form action="{{ route('admin.localidades.update', $loc->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">
+                        @csrf
+                        @method('PUT')
+                        <div class="modal-header bg-slate-900 text-white">
+                            <h5 class="modal-title text-base font-weight-bold">Editar Localidad</h5>
+                            <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                        </div>
+                        <div class="modal-body bg-white">
+                            <div class="form-group">
+                                <label class="text-xs font-weight-bold">Clave</label>
+                                <input type="text" name="clave" class="form-control" value="{{ $loc->clave }}" required>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="text-xs font-weight-bold">Nombre</label>
+                                <input type="text" name="nombre" class="form-control" value="{{ $loc->nombre }}" required>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-light border btn-sm" data-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">Guardar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endforeach
+    @endif
 
     <!-- Modal Crear Municipio -->
     <div class="modal fade" id="modalCrearMunicipio" tabindex="-1" role="dialog">

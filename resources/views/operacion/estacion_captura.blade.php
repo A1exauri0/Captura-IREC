@@ -1813,16 +1813,6 @@
             </div>
         </div>
     </div>
-    <!-- PWA Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register("{{ asset('sw.js') }}")
-                    .then(reg => console.log('Service Worker de Captura registrado:', reg.scope))
-                    .catch(err => console.error('Error al registrar el Service Worker:', err));
-            });
-        }
-    </script>
     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
         @csrf
     </form>
