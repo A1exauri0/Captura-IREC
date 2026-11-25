@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PcCaptura;
+use App\Events\LoteActualizadoEvent;
+use App\Models\ArchivoSesion;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
@@ -43,9 +45,20 @@ class AuthController extends Controller
             ->first();
 
         if ($user && Hash::check($password, $user->password)) {
+            if (!$user->estatus) {
+                return back()->withErrors([
+                    'login' => 'Tu cuenta está desactivada. Contacta al administrador.',
+                ])->onlyInput('login');
+            }
+
             $esCapturista = $user->hasRole('Captura') && !$user->hasAnyRole(['superadmin', 'administrador']);
 
-            Auth::login($user, true);
+            if (!empty($user->remember_token)) {
+                $user->forceFill(['remember_token' => null])->save();
+            }
+
+            Auth::login($user, false);
+            Cookie::queue(Cookie::forget(Auth::guard('web')->getRecallerName()));
             $request->session()->regenerate();
             $request->session()->forget('pc_seleccionada');
 
@@ -68,9 +81,40 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $user = Auth::user();
+
+        if ($user) {
+            if (Schema::hasTable('archivos_sesiones')) {
+                $sesionesActivas = ArchivoSesion::where('user_id', $user->id)
+                    ->where('estado', 'en_captura')
+                    ->get(['id', 'archivo_nombre']);
+
+                if ($sesionesActivas->isNotEmpty()) {
+                    ArchivoSesion::whereIn('id', $sesionesActivas->pluck('id'))->delete();
+
+                    foreach ($sesionesActivas as $sesion) {
+                        try {
+                            broadcast(new LoteActualizadoEvent('lote_eliminado', [
+                                'id'   => $sesion->id,
+                                'lote' => $sesion->archivo_nombre,
+                            ]));
+                        } catch (\Throwable $e) {
+                            // No interrumpir el cierre de sesión si WebSockets no responde
+                        }
+                    }
+                }
+            }
+
+            if (!empty($user->remember_token)) {
+                $user->forceFill(['remember_token' => null])->save();
+            }
+        }
+
         Auth::logout();
+        Cookie::queue(Cookie::forget(Auth::guard('web')->getRecallerName()));
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect()->route('login');
     }
 }
