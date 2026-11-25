@@ -27,7 +27,7 @@ class TurnosSeeder extends Seeder
                 'color_hex'        => '#f59e0b',
                 'descripcion'      => 'Turno vespertino estándar (14:00 a 20:00)',
                 'estatus'          => true,
-            ]
+            ],
             [
                 'nombre'           => 'Mixto',
                 'hora_entrada'     => '09:00:00',
