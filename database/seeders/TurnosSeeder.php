@@ -12,31 +12,22 @@ class TurnosSeeder extends Seeder
         $turnos = [
             [
                 'nombre'           => 'Matutino',
-                'hora_entrada'     => '07:00:00',
-                'hora_salida'      => '15:00:00',
+                'hora_entrada'     => '06:00:00',
+                'hora_salida'      => '12:00:00',
                 'cruza_medianoche' => false,
                 'color_hex'        => '#10b981',
-                'descripcion'      => 'Turno matutino estándar (07:00 a 15:00)',
+                'descripcion'      => 'Turno matutino estándar (06:00 a 12:00)',
                 'estatus'          => true,
             ],
             [
                 'nombre'           => 'Vespertino',
-                'hora_entrada'     => '15:00:00',
-                'hora_salida'      => '22:30:00',
+                'hora_entrada'     => '14:00:00',
+                'hora_salida'      => '20:00:00',
                 'cruza_medianoche' => false,
                 'color_hex'        => '#f59e0b',
-                'descripcion'      => 'Turno vespertino estándar (15:00 a 22:30)',
+                'descripcion'      => 'Turno vespertino estándar (14:00 a 20:00)',
                 'estatus'          => true,
-            ],
-            [
-                'nombre'           => 'Nocturno',
-                'hora_entrada'     => '22:30:00',
-                'hora_salida'      => '06:30:00',
-                'cruza_medianoche' => true,
-                'color_hex'        => '#3b82f6',
-                'descripcion'      => 'Turno nocturno con cruce de medianoche (22:30 a 06:30)',
-                'estatus'          => true,
-            ],
+            ]
             [
                 'nombre'           => 'Mixto',
                 'hora_entrada'     => '09:00:00',
@@ -48,11 +39,11 @@ class TurnosSeeder extends Seeder
             ],
             [
                 'nombre'           => 'Calidad',
-                'hora_entrada'     => '08:00:00',
-                'hora_salida'      => '17:00:00',
+                'hora_entrada'     => '09:00:00',
+                'hora_salida'      => '18:00:00',
                 'cruza_medianoche' => false,
                 'color_hex'        => '#06b6d4',
-                'descripcion'      => 'Turno de revisión y control de calidad (08:00 a 17:00)',
+                'descripcion'      => 'Turno de revisión y control de calidad (09:00 a 18:00)',
                 'estatus'          => true,
             ],
         ];
