@@ -7,9 +7,11 @@
     <title>Captura Sellos</title>
     <!-- PWA Manifest & Meta -->
     <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <meta name="theme-color" content="#1f2937">
+    <meta name="theme-color" content="#034d6d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Captura IREC">
     <link rel="icon" type="image/png" href="{{ asset('img/favicon.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('img/favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('img/pwa-192.png') }}">
 
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1813,6 +1815,13 @@
             </div>
         </div>
     </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ asset('sw.js') }}").catch(() => {});
+            });
+        }
+    </script>
     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
         @csrf
     </form>

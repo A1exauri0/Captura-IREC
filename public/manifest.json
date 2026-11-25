@@ -1,16 +1,39 @@
 {
-    "name": "Digitalización Chiapas 2026 — Estación de Captura y Auditoría PDF",
-    "short_name": "Digitalización Chiapas 2026",
-    "start_url": "/captura",
+    "id": "/",
+    "name": "Digitalización Chiapas 2026 — Captura y Auditoría PDF",
+    "short_name": "Captura IREC",
+    "description": "Sistema de captura, validación y trazabilidad documental IREC",
+    "lang": "es-MX",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "orientation": "landscape",
     "background_color": "#0f172a",
     "theme_color": "#034d6d",
-    "description": "Sistema de captura, validación y trazabilidad documental IREC",
     "icons": [
         {
-            "src": "/img/favicon.png",
+            "src": "/img/pwa-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/img/pwa-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/img/pwa-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/img/pwa-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ]
 }
