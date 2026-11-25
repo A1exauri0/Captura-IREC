@@ -118,22 +118,6 @@
                                 Excel General
                             </button>
                         </div>
-
-                        <div class="col-sm-6 col-md-3 col-lg-1-5 col-xl mb-2">
-                            <label class="form-label"
-                                style="visibility: hidden; display: block; margin-bottom: 8px;">Bono:</label>
-                            <button type="button" id="btnDescargarExcelBono" class="btn btn-warning btn-block"
-                                style="background-color: #d97706; border-color: #b45309; color: white; height: calc(1.5em + .75rem + 2px); font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;"
-                                title="Descargar Excel de Bono">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor"
-                                    class="bi bi-award-fill" viewBox="0 0 16 16">
-                                    <path
-                                        d="m8 0 1.669.864 1.858.282.842 1.68 1.337 1.32L13.4 6l.306 1.854-1.337 1.32-.842 1.68-1.858.282L8 12l-1.669-.864-1.858-.282-.842-1.68-1.337-1.32L2.6 6l-.306-1.854 1.337-1.32.842-1.68 1.858-.282L8 0z" />
-                                    <path d="M4 11.794V16l4-1 4 1v-4.206l-2.018.306L8 13.126 6.018 12.1 4 11.794z" />
-                                </svg>
-                                Excel Bono
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -164,14 +148,6 @@
         <input type="hidden" name="inicio" id="excelGeneralFechaInicio">
         <input type="hidden" name="fin" id="excelGeneralFechaFin">
         <input type="hidden" name="tipo" value="catastro">
-    </form>
-
-    <!-- Formulario oculto para descarga de bono -->
-    <form action="{{ route('admin.analytics_catastro.reportes.descargar_excel_resumen') }}" method="POST"
-        id="formDescargarExcelBono" style="display: none;">
-        @csrf
-        <input type="hidden" name="inicio" id="excelBonoFechaInicio">
-        <input type="hidden" name="fin" id="excelBonoFechaFin">
     </form>
 
     <div class="mb-4">
@@ -366,24 +342,13 @@
                 });
             }
 
-            const btnDescargarExcelBono = document.getElementById('btnDescargarExcelBono');
-            if (btnDescargarExcelBono) {
-                btnDescargarExcelBono.addEventListener('click', function () {
-                    document.getElementById('excelBonoFechaInicio').value = fechaInicioInput.value;
-                    document.getElementById('excelBonoFechaFin').value = fechaFinInput.value;
-                    document.getElementById('formDescargarExcelBono').submit();
-                });
-            }
-
             // COLORES POR ACCIÓN
             function getColorByAction(accion) {
-                const lower = accion.toLowerCase();
-                if (lower.includes('validado')) return 'rgb(192, 255, 192)';
-                if (lower.includes('renombrar') || lower.includes('renombrado')) return 'rgb(222, 184, 135)';
-                if (lower.includes('eliminar') || lower.includes('eliminado')) return 'rgb(255, 128, 128)';
-                if (lower.includes('recorte') || lower.includes('inconsistencia')) return 'rgb(255, 255, 192)';
-                if (lower.includes('duplicar') || lower.includes('duplicado')) return 'rgb(192, 235, 255)';
-                return 'rgb(60, 179, 113)';
+                const lower = String(accion || '').toLowerCase();
+                if (lower.includes('valid')) return '#10b981';
+                if (lower.includes('renombr')) return '#0284c7';
+                if (lower.includes('inconsistencia') || lower.includes('recorte') || lower.includes('eliminar') || lower.includes('eliminado')) return '#ef4444';
+                return '#64748b';
             }
 
             function renderTurnoCards(dataTurnos) {

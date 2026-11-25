@@ -1785,30 +1785,30 @@
     </script>
 
     <!-- Modal Catálogo de Inconsistencias (R01-R09) -->
-    <div id="modalInconsistenciaCatalogo" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden">
+    <div id="modalInconsistenciaCatalogo" class="fixed inset-0 bg-black/65 flex items-center justify-center z-[80] hidden">
         <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl shadow-2xl w-[92%] max-w-[480px] p-6 border border-gray-300 dark:border-gray-700">
             <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
                 <i class="fa-solid fa-triangle-exclamation text-amber-500 text-2xl"></i>
                 <div>
                     <h3 class="font-bold text-lg leading-tight">Reportar Inconsistencia</h3>
-                    <span class="text-xs text-gray-500">Notifica al administrador en tiempo real (solo BD)</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Notifica al administrador en tiempo real (solo BD)</span>
                 </div>
             </div>
             <div class="mb-3">
                 <label class="block text-xs font-bold uppercase text-gray-600 dark:text-gray-300 mb-1">Código y Motivo de Rechazo</label>
-                <select id="selectCodigoInconsistencia" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">
+                <select id="selectCodigoInconsistencia" class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded">
                     @foreach(($catalogoInconsistencias ?? []) as $inc)
-                        <option value="{{ $inc->codigo }}">{{ $inc->codigo }} — {{ $inc->motivo_rechazo }}</option>
+                        <option value="{{ $inc->codigo }}" class="bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">{{ $inc->codigo }} — {{ $inc->motivo_rechazo }}</option>
                     @endforeach
                 </select>
                 <p id="lblAccionCorrectivaInc" class="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1.5"></p>
             </div>
             <div class="mb-4">
                 <label class="block text-xs font-bold uppercase text-gray-600 dark:text-gray-300 mb-1">Observaciones adicionales (opcional)</label>
-                <textarea id="txtNotaInconsistencia" rows="2" class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded" placeholder="Detalle adicional para el supervisor..."></textarea>
+                <textarea id="txtNotaInconsistencia" rows="2" class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded" placeholder="Detalle adicional para el supervisor..."></textarea>
             </div>
             <div class="flex justify-end gap-2">
-                <button type="button" id="btnCancelarIncCatalogo" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 rounded font-semibold text-sm">Cancelar</button>
+                <button type="button" id="btnCancelarIncCatalogo" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 rounded font-semibold text-sm">Cancelar</button>
                 <button type="button" id="btnConfirmarIncCatalogo" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded text-sm">
                     <i class="fa-solid fa-paper-plane mr-1"></i> Enviar Inconsistencia
                 </button>

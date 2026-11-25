@@ -184,6 +184,30 @@ class CapturaController extends Controller
             ->orderBy('codigo')
             ->get(['codigo', 'motivo_rechazo', 'accion_correctiva']);
 
+        // Si en algún servidor aún no se ha ejecutado el seeder, sembrar el catálogo base R01-R09 automáticamente
+        if ($catalogoInconsistencias->isEmpty()) {
+            $baseInc = [
+                ['codigo' => 'R01', 'motivo_rechazo' => 'Imagen ilegible o borrosa',           'accion_correctiva' => 'Reescanear documento'],
+                ['codigo' => 'R02', 'motivo_rechazo' => 'Página faltante',                     'accion_correctiva' => 'Completar escaneo'],
+                ['codigo' => 'R03', 'motivo_rechazo' => 'Página duplicada',                    'accion_correctiva' => 'Eliminar página duplicada'],
+                ['codigo' => 'R04', 'motivo_rechazo' => 'Página invertida o rotada',           'accion_correctiva' => 'Rotar página correctamente'],
+                ['codigo' => 'R05', 'motivo_rechazo' => 'Documento incompleto o recortado',    'accion_correctiva' => 'Reescanear completo'],
+                ['codigo' => 'R06', 'motivo_rechazo' => 'Archivo dañado o corrupto',           'accion_correctiva' => 'Regenerar PDF'],
+                ['codigo' => 'R07', 'motivo_rechazo' => 'Sello sin datos legibles',            'accion_correctiva' => 'Verificar libro físico'],
+                ['codigo' => 'R08', 'motivo_rechazo' => 'No corresponde a la delegación/lote', 'accion_correctiva' => 'Reubicar expediente'],
+                ['codigo' => 'R09', 'motivo_rechazo' => 'Otra inconsistencia',                 'accion_correctiva' => 'Revisar con supervisor'],
+            ];
+            foreach ($baseInc as $rowInc) {
+                CatalogoInconsistencia::firstOrCreate(
+                    ['codigo' => $rowInc['codigo']],
+                    array_merge($rowInc, ['activo' => true])
+                );
+            }
+            $catalogoInconsistencias = CatalogoInconsistencia::where('activo', true)
+                ->orderBy('codigo')
+                ->get(['codigo', 'motivo_rechazo', 'accion_correctiva']);
+        }
+
         return view('operacion.estacion_captura', compact(
             'anios',
             'delegaciones',

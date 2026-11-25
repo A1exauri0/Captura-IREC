@@ -153,15 +153,6 @@
         <input type="hidden" name="tipo" value="sellos">
     </form>
 
-    <!-- Formulario oculto para descarga de bono -->
-    <form action="{{ route('admin.analytics_sellos.reportes.descargar_excel_bono') }}" method="POST"
-        id="formDescargarExcelBono" style="display: none;">
-        @csrf
-        <input type="hidden" name="inicio" id="excelBonoFechaInicio">
-        <input type="hidden" name="fin" id="excelBonoFechaFin">
-        <input type="hidden" name="tipo_sello" id="excelBonoTipoSello">
-    </form>
-
     <div class="mb-4">
         <div id="turnosCardsContainer" class="row w-100 mb-4 g-2 mx-0"></div>
     </div>
@@ -369,17 +360,6 @@
                     document.getElementById('excelGeneralFechaInicio').value = fechaInicioInput.value;
                     document.getElementById('excelGeneralFechaFin').value = fechaFinInput.value;
                     document.getElementById('formDescargarExcelGeneral').submit();
-                });
-            }
-
-            // Descarga Excel Bono (toma el rango de fechas seleccionado en los inputs)
-            const btnDescargarExcelBono = document.getElementById('btnDescargarExcelBono');
-            if (btnDescargarExcelBono) {
-                btnDescargarExcelBono.addEventListener('click', function () {
-                    document.getElementById('excelBonoFechaInicio').value = fechaInicioInput.value;
-                    document.getElementById('excelBonoFechaFin').value = fechaFinInput.value;
-                    document.getElementById('excelBonoTipoSello').value = tipoSelloInput.value;
-                    document.getElementById('formDescargarExcelBono').submit();
                 });
             }
 
