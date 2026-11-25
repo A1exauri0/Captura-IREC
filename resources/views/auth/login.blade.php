@@ -11,7 +11,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+<body class="min-h-screen bg-white flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
         <div class="bg-linear-to-r from-slate-900 to-sky-900 p-6 text-center text-white">
             <div class="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto mb-3 shadow">
