@@ -68,7 +68,7 @@
     </div>
 
     <!-- Modales Editar Código (fuera de <table>) -->
-    @foreach($catalogo as $item)
+    @foreach($items as $item)
         <div class="modal fade" id="modalEditarInc{{ $item->id }}" tabindex="-1" role="dialog" aria-hidden="true">
             <div class="modal-dialog" role="document">
                 <form action="{{ route('admin.catalogo_inconsistencias.update', $item->id) }}" method="POST" class="modal-content bg-white border-0 shadow-lg">

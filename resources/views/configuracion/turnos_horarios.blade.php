@@ -262,7 +262,7 @@
 $(document).ready(function() {
     $('.btn-editar-turno').click(function() {
         const id = $(this).data('id');
-        $('#formEditarTurno').attr('action', '/turnos/' + id);
+        $('#formEditarTurno').attr('action', "{{ url('/admin/turnos') }}/" + id);
         $('#editTurnoNombre').val($(this).data('nombre'));
         $('#editTurnoEntrada').val($(this).data('entrada'));
         $('#editTurnoSalida').val($(this).data('salida'));

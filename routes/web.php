@@ -229,21 +229,18 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/{id}', [FlujoStellumController::class, 'eliminarAsignacion'])->name('eliminar');
         });
 
-        // Catálogo de Números de PC para selección al iniciar sesión
-        Route::name('admin.pcs.')->prefix('pcs')->group(function () {
-            Route::get('/', [PcCapturaController::class, 'index'])->name('index');
-            Route::post('/', [PcCapturaController::class, 'store'])->name('store');
-            Route::put('/{id}', [PcCapturaController::class, 'update'])->name('update');
-            Route::delete('/{id}', [PcCapturaController::class, 'destroy'])->name('destroy');
-        });
+        // Redirección legacy de /admin/pcs hacia la vista unificada /admin/equipos
+        Route::get('/pcs', fn () => redirect()->route('admin.equipos.index'))->name('admin.pcs.index');
 
-        // Inventario de Equipos sincronizado en tiempo real con Stellum + Asignación de PC por Usuario
+        // Inventario de Equipos unificado con Números de PC (sincronizado con Stellum)
         Route::name('admin.equipos.')->prefix('equipos')->group(function () {
             Route::get('/', [InventarioEquiposController::class, 'index'])->name('index');
+            Route::post('/asignar-numero-pc', [InventarioEquiposController::class, 'asignarNumeroPc'])->name('asignar_numero_pc');
+            Route::post('/auto-asignar-pcs', [InventarioEquiposController::class, 'autoAsignarNumerosPc'])->name('auto_asignar_pcs');
             Route::match(['get', 'post'], '/api', [InventarioEquiposController::class, 'apiProxy'])->name('api');
             Route::get('/exportar-excel', [InventarioEquiposController::class, 'exportarExcel'])->name('exportar_excel');
             Route::post('/asignar-usuario', [InventarioEquiposController::class, 'asignarUsuario'])->name('asignar_usuario');
-            Route::delete('/desasignar-usuario/{userId}', [InventarioEquiposController::class, 'desasignarUsuario'])->name('desasignar_usuario');
+            Route::delete('/desasignar-usuario/{userId}/{asignacionId?}', [InventarioEquiposController::class, 'desasignarUsuario'])->name('desasignar_usuario');
         });
     });
 });

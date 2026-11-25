@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PcCaptura;
 use App\Models\User;
+use App\Models\UsuarioEquipo;
 use App\Services\StellumBridgeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class InventarioEquiposController extends Controller
 {
     /**
-     * Muestra únicamente el listado de equipos marcados como ENTREGADOS en Stellum
-     * y permite asignarlos a los usuarios de Captura-IREC.
+     * Muestra el listado unificado de equipos ENTREGADOS desde Stellum,
+     * permite asignarles Número de PC (solo el número, sin prefijo "PC-")
+     * y asignar múltiples equipos por usuario y múltiples usuarios por equipo (rotación por turnos).
      */
     public function index(StellumBridgeService $bridge)
     {
@@ -23,18 +27,140 @@ class InventarioEquiposController extends Controller
         $conexionStellumOk = (bool) ($respStellum['ok'] ?? false);
         $errorStellum = $respStellum['error'] ?? null;
 
-        // Mapa rápido: no_serie => usuario asignado en Captura-IREC
-        $mapaAsignados = $usuarios
-            ->filter(fn ($u) => !empty($u->equipo_no_serie))
-            ->keyBy('equipo_no_serie');
+        // Asignaciones múltiples (muchos a muchos) en usuario_equipos
+        $asignaciones = Schema::hasTable('usuario_equipos')
+            ? UsuarioEquipo::with(['usuario.turnoRelacion'])->get()
+            : collect();
+
+        // Mapa: no_serie => colección de UsuarioEquipo (varios usuarios pueden rotar el mismo equipo)
+        $mapaAsignadosPorSerie = $asignaciones->groupBy('no_serie');
+
+        // Mapa: user_id => colección de UsuarioEquipo (un usuario puede tener varios equipos)
+        $mapaEquiposPorUsuario = $asignaciones->groupBy('user_id');
+
+        // Mapa rápido: no_serie => registro en pcs_captura (Número de PC asignado)
+        $mapaPcsPorSerie = Schema::hasTable('pcs_captura')
+            ? PcCaptura::whereNotNull('no_serie')->where('no_serie', '!=', '')->get()->keyBy('no_serie')
+            : collect();
 
         return view('configuracion.inventario_equipos', compact(
             'usuarios',
             'equiposEntregados',
             'conexionStellumOk',
             'errorStellum',
-            'mapaAsignados'
+            'mapaAsignadosPorSerie',
+            'mapaEquiposPorUsuario',
+            'mapaPcsPorSerie'
         ));
+    }
+
+    /**
+     * Asigna o actualiza el Número de PC (solo el número, ej. "1", "2", "15") en `pcs_captura`
+     * tomando directamente el `no_serie`, marca y ubicación que vienen de Stellum.
+     */
+    public function asignarNumeroPc(Request $request)
+    {
+        $data = $request->validate([
+            'no_serie'  => 'required|string|max:100',
+            'numero_pc' => 'required|string|max:30',
+            'marca'     => 'nullable|string|max:100',
+            'tipo'      => 'nullable|string|max:40',
+            'ubicacion' => 'nullable|string|max:120',
+        ]);
+
+        $noSerie = trim($data['no_serie']);
+        // Guardar solo el número (quitar prefijo "PC-" si el usuario lo escribió por costumbre)
+        $numeroPc = trim((string) preg_replace('/^PC[-\s]*/i', '', trim($data['numero_pc'])));
+        if ($numeroPc === '') {
+            return back()->with('error', 'Ingresa un número de PC válido.');
+        }
+
+        $descripcion = trim(($data['tipo'] ?? 'PC') . ' ' . ($data['marca'] ?? ''));
+
+        // Desvincular este no_serie de cualquier otro numero_pc previo
+        PcCaptura::where('no_serie', $noSerie)
+            ->where('numero_pc', '!=', $numeroPc)
+            ->update(['no_serie' => null]);
+
+        PcCaptura::updateOrCreate(
+            ['numero_pc' => $numeroPc],
+            [
+                'no_serie'    => $noSerie,
+                'ubicacion'   => $data['ubicacion'] ?? null,
+                'descripcion' => $descripcion !== '' ? $descripcion : null,
+                'activo'      => true,
+            ]
+        );
+
+        // Sincronizar numero_pc en las asignaciones usuario_equipos de ese no_serie
+        if (Schema::hasTable('usuario_equipos')) {
+            UsuarioEquipo::where('no_serie', $noSerie)->update(['numero_pc' => $numeroPc]);
+        }
+
+        return back()->with('success', "Equipo {$noSerie} registrado con número {$numeroPc} en base de datos.");
+    }
+
+    /**
+     * Registra automáticamente en `pcs_captura` (1, 2, 3...) todos los equipos
+     * entregados de Stellum que aún no tengan número de PC asignado.
+     */
+    public function autoAsignarNumerosPc(StellumBridgeService $bridge)
+    {
+        $resp = $bridge->obtenerEquiposEntregados();
+        if (empty($resp['ok'])) {
+            return back()->with('error', 'No se pudo consultar Stellum para sincronizar equipos.');
+        }
+
+        $equipos = collect($resp['equipos'] ?? []);
+        $seriesYaAsignadas = PcCaptura::whereNotNull('no_serie')
+            ->where('no_serie', '!=', '')
+            ->pluck('no_serie')
+            ->flip();
+
+        $ocupados = PcCaptura::whereNotNull('no_serie')
+            ->where('no_serie', '!=', '')
+            ->pluck('numero_pc')
+            ->flip();
+
+        $asignadosNuevos = 0;
+        $contador = 1;
+
+        foreach ($equipos as $eq) {
+            $serie = trim((string) ($eq['no_serie'] ?? ''));
+            if ($serie === '' || $seriesYaAsignadas->has($serie)) {
+                continue;
+            }
+
+            // Buscar el siguiente número libre (1, 2, 3...)
+            do {
+                $candidato = (string) $contador;
+                $contador++;
+            } while ($ocupados->has($candidato));
+
+            $descripcion = trim((string) ($eq['tipo'] ?? 'PC') . ' ' . (string) ($eq['marca'] ?? ''));
+
+            PcCaptura::updateOrCreate(
+                ['numero_pc' => $candidato],
+                [
+                    'no_serie'    => $serie,
+                    'ubicacion'   => $eq['ubicacion'] ?? null,
+                    'descripcion' => $descripcion !== '' ? $descripcion : null,
+                    'activo'      => true,
+                ]
+            );
+
+            if (Schema::hasTable('usuario_equipos')) {
+                UsuarioEquipo::where('no_serie', $serie)->update(['numero_pc' => $candidato]);
+            }
+
+            $ocupados->put($candidato, true);
+            $seriesYaAsignadas->put($serie, true);
+            $asignadosNuevos++;
+        }
+
+        return back()->with('success', $asignadosNuevos > 0
+            ? "Se asignó número de PC automáticamente a {$asignadosNuevos} equipo(s) desde Stellum."
+            : 'Todos los equipos entregados de Stellum ya tienen un Número de PC asignado.');
     }
 
     /**
@@ -74,13 +200,15 @@ class InventarioEquiposController extends Controller
     }
 
     /**
-     * Asigna un equipo de Stellum a un usuario de Captura-IREC y actualiza `prestado_a` en Stellum
-     * para mantener ambos sistemas sincronizados al instante.
+     * Asigna un equipo de Stellum a uno o varios usuarios (rotación por turnos) sin desvincular
+     * otros equipos del usuario ni otros usuarios del mismo equipo.
      */
     public function asignarUsuario(Request $request, StellumBridgeService $bridge)
     {
         $data = $request->validate([
-            'user_id'           => 'required|exists:users,id',
+            'user_ids'          => 'nullable|array',
+            'user_ids.*'        => 'exists:users,id',
+            'user_id'           => 'nullable|exists:users,id',
             'equipo_no_serie'   => 'required|string|max:100',
             'equipo_tipo'       => 'nullable|string|max:30',
             'equipo_tabla'      => 'nullable|string|max:30',
@@ -89,66 +217,119 @@ class InventarioEquiposController extends Controller
             'equipo_ubicacion'  => 'nullable|string|max:100',
         ]);
 
-        // Liberar ese mismo no_serie si estaba asignado a otro usuario en Captura-IREC
-        User::where('equipo_no_serie', $data['equipo_no_serie'])
-            ->where('id', '!=', $data['user_id'])
-            ->update([
-                'equipo_no_serie'   => null,
-                'equipo_tipo'       => null,
-                'equipo_tabla'      => null,
-                'equipo_id_stellum' => null,
-                'equipo_marca'      => null,
-                'equipo_ubicacion'  => null,
-            ]);
+        $idsUsuarios = collect($data['user_ids'] ?? [])
+            ->when(!empty($data['user_id']), fn ($c) => $c->push($data['user_id']))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
 
-        $usuario = User::findOrFail($data['user_id']);
-        $usuario->update([
-            'equipo_no_serie'   => trim($data['equipo_no_serie']),
-            'equipo_tipo'       => $data['equipo_tipo'] ?: 'PC',
-            'equipo_tabla'      => $data['equipo_tabla'] ?: 'computadoras',
-            'equipo_id_stellum' => $data['equipo_id_stellum'] ?? null,
-            'equipo_marca'      => $data['equipo_marca'] ?? null,
-            'equipo_ubicacion'  => $data['equipo_ubicacion'] ?? null,
-        ]);
+        if ($idsUsuarios->isEmpty()) {
+            return back()->with('error', 'Selecciona al menos un usuario para asignar el equipo.');
+        }
 
-        // Sincronizar también en Stellum (campo prestado_a) si tenemos id + tabla
+        $serie = trim($data['equipo_no_serie']);
+        $numPcLocal = Schema::hasTable('pcs_captura')
+            ? PcCaptura::where('no_serie', $serie)->value('numero_pc')
+            : null;
+
+        $usuariosAsignados = User::whereIn('id', $idsUsuarios)->get();
+        foreach ($usuariosAsignados as $usuario) {
+            UsuarioEquipo::updateOrCreate(
+                ['user_id' => $usuario->id, 'no_serie' => $serie],
+                [
+                    'numero_pc'         => $numPcLocal,
+                    'tipo'              => $data['equipo_tipo'] ?: 'PC',
+                    'marca'             => $data['equipo_marca'] ?? null,
+                    'ubicacion'         => $data['equipo_ubicacion'] ?? null,
+                    'tabla_origen'      => $data['equipo_tabla'] ?: 'computadoras',
+                    'equipo_id_stellum' => $data['equipo_id_stellum'] ?? null,
+                ]
+            );
+
+            // Mantener equipo_no_serie principal actualizado en users por compatibilidad
+            if (empty($usuario->equipo_no_serie)) {
+                $usuario->update([
+                    'equipo_no_serie'   => $serie,
+                    'equipo_tipo'       => $data['equipo_tipo'] ?: 'PC',
+                    'equipo_tabla'      => $data['equipo_tabla'] ?: 'computadoras',
+                    'equipo_id_stellum' => $data['equipo_id_stellum'] ?? null,
+                    'equipo_marca'      => $data['equipo_marca'] ?? null,
+                    'equipo_ubicacion'  => $data['equipo_ubicacion'] ?? null,
+                ]);
+            }
+        }
+
+        // Sincronizar también en Stellum (campo prestado_a con todos los usuarios asignados a ese equipo)
         if (!empty($data['equipo_id_stellum']) && !empty($data['equipo_tabla'])) {
+            $todosNombres = UsuarioEquipo::with('usuario')
+                ->where('no_serie', $serie)
+                ->get()
+                ->map(fn ($ue) => $ue->usuario?->name)
+                ->filter()
+                ->unique()
+                ->implode(', ');
+
             $bridge->proxyEquipos('POST', ['accion' => 'actualizar_prestamo'], [
                 'accion'       => 'actualizar_prestamo',
                 'id'           => (int) $data['equipo_id_stellum'],
                 'tabla_origen' => $data['equipo_tabla'],
-                'prestado_a'   => $usuario->name,
+                'prestado_a'   => $todosNombres,
             ]);
         }
 
-        return back()->with('success', "Equipo {$usuario->equipo_no_serie} asignado a {$usuario->name} y sincronizado con Stellum.");
+        return back()->with('success', "Equipo {$serie} asignado correctamente (" . $usuariosAsignados->count() . " usuario(s)).");
     }
 
     /**
-     * Quita el equipo asignado a un usuario y limpia el préstamo en Stellum.
+     * Quita una asignación específica (o todas si no se pasa asignacionId) de un usuario
+     * y actualiza `prestado_a` en Stellum con los usuarios restantes de ese equipo.
      */
-    public function desasignarUsuario(int $userId, StellumBridgeService $bridge)
+    public function desasignarUsuario(int $userId, ?int $asignacionId = null, StellumBridgeService $bridge = null)
     {
+        $bridge = $bridge ?: app(StellumBridgeService::class);
         $usuario = User::findOrFail($userId);
 
-        if ($usuario->equipo_id_stellum && $usuario->equipo_tabla) {
-            $bridge->proxyEquipos('POST', ['accion' => 'actualizar_prestamo'], [
-                'accion'       => 'actualizar_prestamo',
-                'id'           => (int) $usuario->equipo_id_stellum,
-                'tabla_origen' => $usuario->equipo_tabla,
-                'prestado_a'   => '',
-            ]);
+        $asignacion = $asignacionId
+            ? UsuarioEquipo::where('id', $asignacionId)->where('user_id', $userId)->first()
+            : UsuarioEquipo::where('user_id', $userId)->first();
+
+        $serie = $asignacion?->no_serie ?: $usuario->equipo_no_serie;
+        $idStellum = $asignacion?->equipo_id_stellum ?: $usuario->equipo_id_stellum;
+        $tablaStellum = $asignacion?->tabla_origen ?: $usuario->equipo_tabla;
+
+        if ($asignacion) {
+            $asignacion->delete();
+        } else {
+            UsuarioEquipo::where('user_id', $userId)->delete();
         }
 
-        $serie = $usuario->equipo_no_serie;
+        // Actualizar equipo principal en users con otro equipo restante del usuario (si tiene)
+        $otroEquipo = UsuarioEquipo::where('user_id', $userId)->latest('id')->first();
         $usuario->update([
-            'equipo_no_serie'   => null,
-            'equipo_tipo'       => null,
-            'equipo_tabla'      => null,
-            'equipo_id_stellum' => null,
-            'equipo_marca'      => null,
-            'equipo_ubicacion'  => null,
+            'equipo_no_serie'   => $otroEquipo?->no_serie,
+            'equipo_tipo'       => $otroEquipo?->tipo,
+            'equipo_tabla'      => $otroEquipo?->tabla_origen,
+            'equipo_id_stellum' => $otroEquipo?->equipo_id_stellum,
+            'equipo_marca'      => $otroEquipo?->marca,
+            'equipo_ubicacion'  => $otroEquipo?->ubicacion,
         ]);
+
+        if ($idStellum && $tablaStellum && $serie) {
+            $restantes = UsuarioEquipo::with('usuario')
+                ->where('no_serie', $serie)
+                ->get()
+                ->map(fn ($ue) => $ue->usuario?->name)
+                ->filter()
+                ->unique()
+                ->implode(', ');
+
+            $bridge->proxyEquipos('POST', ['accion' => 'actualizar_prestamo'], [
+                'accion'       => 'actualizar_prestamo',
+                'id'           => (int) $idStellum,
+                'tabla_origen' => $tablaStellum,
+                'prestado_a'   => $restantes,
+            ]);
+        }
 
         return back()->with('success', "Se liberó el equipo {$serie} del usuario {$usuario->name}.");
     }

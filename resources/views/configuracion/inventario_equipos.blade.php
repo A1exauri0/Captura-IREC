@@ -6,9 +6,18 @@
 @section('crud_subtitulo', 'Listado consultado en tiempo real desde Stellum únicamente con equipos marcados como entregados, listo para asignarlos a los usuarios.')
 
 @section('crud_acciones')
-    <a href="{{ route('admin.equipos.index') }}" class="btn btn-light border btn-sm">
-        <i class="fa-solid fa-rotate mr-1"></i> Actualizar desde Stellum
-    </a>
+    <div class="d-flex flex-wrap" style="gap: 6px;">
+        <form method="POST" action="{{ route('admin.equipos.auto_asignar_pcs') }}" class="d-inline"
+              onsubmit="return confirm('¿Asignar automáticamente Número de PC (1, 2, 3...) a todos los equipos de Stellum que aún no tienen uno?');">
+            @csrf
+            <button type="submit" class="btn btn-primary btn-sm" style="background-color:#034d6d;border-color:#034d6d;">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Auto-asignar Números de PC
+            </button>
+        </form>
+        <a href="{{ route('admin.equipos.index') }}" class="btn btn-light border btn-sm">
+            <i class="fa-solid fa-rotate mr-1"></i> Actualizar desde Stellum
+        </a>
+    </div>
 @endsection
 
 @section('contenido')
@@ -21,7 +30,7 @@
 
     @php
         $totalEntregados = $equiposEntregados->count();
-        $totalAsignados  = $mapaAsignados->count();
+        $totalAsignados  = $mapaAsignadosPorSerie->count();
         $totalDisponibles = max(0, $totalEntregados - $totalAsignados);
     @endphp
 
@@ -79,14 +88,14 @@
             <table class="table table-hover mb-0 text-sm" id="tablaEquiposEntregados">
                 <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
                     <tr>
-                        <th class="px-3">No. Serie</th>
+                        <th class="px-3">Número de PC</th>
+                        <th>No. Serie (Stellum)</th>
                         <th>Tipo</th>
                         <th>Marca</th>
                         <th>Ubicación</th>
-                        <th>Hora Entrega</th>
                         <th>Préstamo (Stellum)</th>
-                        <th>Usuario Asignado (Captura-IREC)</th>
-                        <th class="text-right px-3">Asignar</th>
+                        <th>Usuario Asignado</th>
+                        <th class="text-right px-3">Usuario</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,10 +103,25 @@
                         @php
                             $serie = $eq['no_serie'] ?? '';
                             $tipoEq = $eq['tipo'] ?? 'PC';
-                            $usuarioAsig = $mapaAsignados->get($serie);
+                            $asignadosSerie = $mapaAsignadosPorSerie->get($serie, collect());
+                            $pcLocal = $mapaPcsPorSerie->get($serie);
                         @endphp
                         <tr data-tipo="{{ strtolower($tipoEq) }}">
-                            <td class="px-3 font-mono font-weight-bold text-sky-800">{{ $serie }}</td>
+                            <td class="px-3" style="min-width: 135px;">
+                                <form method="POST" action="{{ route('admin.equipos.asignar_numero_pc') }}" class="d-flex align-items-center" style="gap: 4px;">
+                                    @csrf
+                                    <input type="hidden" name="no_serie" value="{{ $serie }}">
+                                    <input type="hidden" name="tipo" value="{{ $tipoEq }}">
+                                    <input type="hidden" name="marca" value="{{ $eq['marca'] ?? '' }}">
+                                    <input type="hidden" name="ubicacion" value="{{ $eq['ubicacion'] ?? '' }}">
+                                    <input type="text" name="numero_pc" value="{{ $pcLocal->numero_pc ?? '' }}" placeholder="Ej. 1" required
+                                           class="form-control form-control-sm font-mono font-weight-bold text-center" style="width: 68px;">
+                                    <button type="submit" class="btn btn-xs {{ $pcLocal ? 'btn-outline-success' : 'btn-primary' }} py-1 px-2" title="Guardar Número de PC en BD">
+                                        <i class="fa-solid fa-floppy-disk"></i>
+                                    </button>
+                                </form>
+                            </td>
+                            <td class="font-mono font-weight-bold text-sky-800">{{ $serie }}</td>
                             <td>
                                 <span class="badge {{ strtolower($tipoEq) === 'laptop' ? 'badge-info' : 'badge-secondary' }}">
                                     {{ strtoupper($tipoEq) }}
@@ -105,13 +129,19 @@
                             </td>
                             <td class="font-weight-bold text-slate-700">{{ $eq['marca'] ?? '-' }}</td>
                             <td class="text-xs">{{ $eq['ubicacion'] ?? '-' }}</td>
-                            <td class="text-xs text-muted">{{ $eq['hora_entrega'] ?? '-' }}</td>
                             <td class="text-xs">{{ !empty($eq['prestado_a']) ? $eq['prestado_a'] : '—' }}</td>
                             <td>
-                                @if($usuarioAsig)
-                                    <span class="badge badge-success px-2 py-1">
-                                        <i class="fa-solid fa-user mr-1"></i> {{ $usuarioAsig->name }}
-                                    </span>
+                                @if($asignadosSerie->isNotEmpty())
+                                    <div class="d-flex flex-wrap" style="gap: 4px;">
+                                        @foreach($asignadosSerie as $asig)
+                                            @if($asig->usuario)
+                                                <span class="badge badge-success px-2 py-1">
+                                                    <i class="fa-solid fa-user mr-1"></i>{{ $asig->usuario->name }}
+                                                    <span class="opacity-75">({{ $asig->usuario->turnoRelacion->nombre ?? $asig->usuario->turno ?? 'Turno' }})</span>
+                                                </span>
+                                            @endif
+                                        @endforeach
+                                    </div>
                                 @else
                                     <span class="badge badge-light border text-muted">Disponible</span>
                                 @endif
@@ -120,7 +150,7 @@
                                 <button type="button"
                                         class="btn btn-sm btn-outline-primary"
                                         onclick="abrirModalAsignar({{ json_encode($eq) }})">
-                                    <i class="fa-solid fa-link mr-1"></i> {{ $usuarioAsig ? 'Reasignar' : 'Asignar' }}
+                                    <i class="fa-solid fa-user-plus mr-1"></i> Asignar
                                 </button>
                             </td>
                         </tr>
@@ -154,29 +184,37 @@
                 </thead>
                 <tbody>
                     @foreach($usuarios as $u)
+                        @php $equiposUsr = $mapaEquiposPorUsuario->get($u->id, collect()); @endphp
                         <tr>
                             <td class="px-3 font-weight-bold text-slate-800">{{ $u->name }} <span class="text-xs text-muted">({{ $u->user }})</span></td>
                             <td class="text-xs">{{ $u->turnoRelacion->nombre ?? $u->turno ?? 'Matutino' }}</td>
-                            <td>
-                                @if($u->equipo_no_serie)
-                                    <span class="badge badge-primary" style="background-color:#034d6d;">
-                                        {{ strtoupper($u->equipo_tipo ?: 'PC') }} · {{ $u->equipo_no_serie }}
-                                    </span>
+                            <td colspan="2">
+                                @if($equiposUsr->isNotEmpty())
+                                    <div class="d-flex flex-wrap align-items-center" style="gap: 6px;">
+                                        @foreach($equiposUsr as $eqU)
+                                            @php $numPcU = $eqU->numero_pc ?: ($mapaPcsPorSerie->get($eqU->no_serie)?->numero_pc); @endphp
+                                            <span class="badge badge-light border px-2 py-1 d-inline-flex align-items-center" style="gap: 6px;">
+                                                @if($numPcU)
+                                                    <span class="badge badge-success">#{{ $numPcU }}</span>
+                                                @endif
+                                                <span class="font-mono text-sky-800 font-weight-bold">{{ $eqU->no_serie }}</span>
+                                                @if($eqU->marca)
+                                                    <span class="text-muted">({{ $eqU->marca }})</span>
+                                                @endif
+                                                <form method="POST" action="{{ route('admin.equipos.desasignar_usuario', [$u->id, $eqU->id]) }}" class="d-inline m-0" onsubmit="return confirm('¿Quitar equipo {{ $eqU->no_serie }} de {{ $u->name }}?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-link text-danger p-0 m-0" style="line-height:1;" title="Quitar este equipo">&times;</button>
+                                                </form>
+                                            </span>
+                                        @endforeach
+                                    </div>
                                 @else
-                                    <span class="text-xs text-muted">Sin equipo asignado</span>
+                                    <span class="text-xs text-muted">Sin equipos asignados</span>
                                 @endif
                             </td>
-                            <td class="text-xs text-muted">
-                                {{ $u->equipo_no_serie ? trim(($u->equipo_marca ?: '') . ' ' . ($u->equipo_ubicacion ? '· ' . $u->equipo_ubicacion : '')) : '—' }}
-                            </td>
-                            <td class="text-right px-3">
-                                @if($u->equipo_no_serie)
-                                    <form method="POST" action="{{ route('admin.equipos.desasignar_usuario', $u->id) }}" class="d-inline" onsubmit="return confirm('¿Liberar equipo {{ $u->equipo_no_serie }} de {{ $u->name }}?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-xs btn-outline-danger py-0 px-2">Liberar</button>
-                                    </form>
-                                @endif
+                            <td class="text-right px-3 text-xs text-muted">
+                                {{ $equiposUsr->count() }} equipo(s)
                             </td>
                         </tr>
                     @endforeach
@@ -208,16 +246,20 @@
                     <input type="hidden" name="equipo_ubicacion" id="inputEquipoUbicacionModal">
 
                     <div class="form-group mb-0">
-                        <label class="text-xs font-weight-bold">Seleccionar Usuario</label>
-                        <select name="user_id" class="form-control" required>
-                            <option value="">-- Seleccionar usuario --</option>
+                        <label class="text-xs font-weight-bold">Seleccionar Usuario(s) — puedes marcar varios para rotación por turno</label>
+                        <input type="text" id="buscarUsuarioModalEquipo" class="form-control form-control-sm mb-2" placeholder="Buscar usuario por nombre, login o turno...">
+                        <div id="listaUsuariosModalEquipo" class="p-2 bg-slate-50 rounded border" style="max-height: 220px; overflow-y: auto;">
                             @foreach($usuarios as $u)
-                                <option value="{{ $u->id }}">
-                                    {{ $u->name }} ({{ $u->user }}){{ $u->equipo_no_serie ? ' [Actual: ' . $u->equipo_no_serie . ']' : '' }}
-                                </option>
+                                <label class="item-usuario-modal d-flex align-items-center justify-content-between mb-1.5 text-sm px-1" style="gap: 8px; cursor: pointer;">
+                                    <span class="d-flex align-items-center" style="gap: 8px;">
+                                        <input type="checkbox" name="user_ids[]" value="{{ $u->id }}">
+                                        <span><strong>{{ $u->name }}</strong> <span class="text-muted text-xs">({{ $u->user }})</span></span>
+                                    </span>
+                                    <span class="badge badge-light border text-xs">{{ $u->turnoRelacion->nombre ?? $u->turno ?? 'Sin turno' }}</span>
+                                </label>
                             @endforeach
-                        </select>
-                        <small class="text-muted">Al guardar, la asignación se refleja en Captura-IREC y actualiza el préstamo en Stellum.</small>
+                        </div>
+                        <small class="text-muted">Permite asignar más de un usuario al mismo equipo (por turno) y más de un equipo a un mismo usuario.</small>
                     </div>
                 </div>
                 <div class="modal-footer bg-light">
@@ -240,8 +282,28 @@
         document.getElementById('inputEquipoIdStellumModal').value = eq.id || '';
         document.getElementById('inputEquipoMarcaModal').value = eq.marca || '';
         document.getElementById('inputEquipoUbicacionModal').value = eq.ubicacion || '';
+        const inputBuscar = document.getElementById('buscarUsuarioModalEquipo');
+        if (inputBuscar) {
+            inputBuscar.value = '';
+            document.querySelectorAll('#listaUsuariosModalEquipo .item-usuario-modal').forEach(el => {
+                el.classList.remove('d-none');
+                el.classList.add('d-flex');
+                const cb = el.querySelector('input[type="checkbox"]');
+                if (cb) cb.checked = false;
+            });
+        }
         $('#modalAsignarEquipo').modal('show');
+        setTimeout(() => inputBuscar?.focus(), 200);
     }
+
+    document.getElementById('buscarUsuarioModalEquipo')?.addEventListener('input', function () {
+        const q = this.value.toLowerCase().trim();
+        document.querySelectorAll('#listaUsuariosModalEquipo .item-usuario-modal').forEach(el => {
+            const coincide = el.innerText.toLowerCase().includes(q);
+            el.classList.toggle('d-none', !coincide);
+            el.classList.toggle('d-flex', coincide);
+        });
+    });
 
     function aplicarFiltrosTabla() {
         const q = (document.getElementById('filtroEquipos')?.value || '').toLowerCase();

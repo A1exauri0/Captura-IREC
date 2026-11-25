@@ -582,7 +582,7 @@
             btnPinAceptar.classList.add('hidden');
 
             try {
-                const resp = await fetch('/autorizaciones/solicitar', {
+                const resp = await fetch("{{ route('admin.autorizaciones.solicitar') }}", {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -607,7 +607,7 @@
 
                 pollPeticionTimer = setInterval(async () => {
                     try {
-                        const rEst = await fetch(`/autorizaciones/${peticionId}/estado`);
+                        const rEst = await fetch(`/captura/autorizaciones/${peticionId}/estado`);
                         const dEst = await rEst.json();
                         if (dEst.estado === 'autorizada') {
                             limpiarTimerPeticion();

@@ -34,8 +34,22 @@ class CapturaController extends Controller
         if ($pcSesion !== '') {
             return $pcSesion;
         }
-        if ($usuario && !empty($usuario->equipo_no_serie)) {
-            return (string) $usuario->equipo_no_serie;
+        if ($usuario) {
+            if (\Illuminate\Support\Facades\Schema::hasTable('usuario_equipos')) {
+                $asignados = \App\Models\UsuarioEquipo::where('user_id', $usuario->id)
+                    ->orderByDesc('updated_at')
+                    ->get();
+                if ($asignados->isNotEmpty()) {
+                    $nums = $asignados->map(fn ($e) => $e->numero_pc ?: $e->no_serie)->filter()->unique()->values()->all();
+                    if (!empty($nums)) {
+                        return implode(', ', $nums);
+                    }
+                }
+            }
+            if (!empty($usuario->equipo_no_serie)) {
+                $pcLocal = \App\Models\PcCaptura::where('no_serie', $usuario->equipo_no_serie)->value('numero_pc');
+                return $pcLocal ?: (string) $usuario->equipo_no_serie;
+            }
         }
         return (string) $request->ip();
     }

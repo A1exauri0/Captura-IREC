@@ -117,16 +117,10 @@
                 "active_routes": ["admin.asignaciones.*"]
             },
             {
-                "label": "Números de PC",
-                "icon": "fa-solid fa-computer",
-                "route": "admin.pcs.index",
-                "active_routes": ["admin.pcs.*"]
-            },
-            {
-                "label": "Inventario de Equipos",
+                "label": "Equipos y Números de PC",
                 "icon": "fa-solid fa-laptop",
                 "route": "admin.equipos.index",
-                "active_routes": ["admin.equipos.*"]
+                "active_routes": ["admin.equipos.*", "admin.pcs.*"]
             },
             {
                 "id": "submenu-catalogos",
