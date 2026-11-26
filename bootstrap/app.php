@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\RestringirCapturistaMiddleware;
+use App\Http\Middleware\VerifyBiometricoToken;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission'            => PermissionMiddleware::class,
             'role_or_permission'    => RoleOrPermissionMiddleware::class,
             'restringir.capturista' => RestringirCapturistaMiddleware::class,
+            'biometrico.token'      => VerifyBiometricoToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

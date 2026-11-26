@@ -15,6 +15,7 @@ class Turno extends Model
         'nombre',
         'hora_entrada',
         'hora_salida',
+        'tolerancia_minutos',
         'cruza_medianoche',
         'color_hex',
         'descripcion',
@@ -22,8 +23,9 @@ class Turno extends Model
     ];
 
     protected $casts = [
-        'cruza_medianoche' => 'boolean',
-        'estatus' => 'boolean',
+        'tolerancia_minutos' => 'integer',
+        'cruza_medianoche'   => 'boolean',
+        'estatus'            => 'boolean',
     ];
 
     public function usuarios()
@@ -57,5 +59,35 @@ class Turno extends Model
         $ent = substr((string) $this->hora_entrada, 0, 5);
         $sal = substr((string) $this->hora_salida, 0, 5);
         return "{$this->nombre} ({$ent} - {$sal})";
+    }
+
+    /**
+     * Calcula los minutos de retardo respecto a la hora_entrada esperada en la fecha_laboral indicada.
+     * Retorna 0 si el empleado ingresó dentro de la tolerancia configurada.
+     */
+    public function calcularRetardoMinutos(\Carbon\Carbon $horaEntrada, string $fechaLaboral, ?int $toleranciaFallback = null): int
+    {
+        if (empty($this->hora_entrada)) {
+            return 0;
+        }
+
+        $entradaStr = strlen((string) $this->hora_entrada) === 5
+            ? $this->hora_entrada . ':00'
+            : (string) $this->hora_entrada;
+
+        $tz = $horaEntrada->getTimezone();
+        $esperada = \Carbon\Carbon::parse("{$fechaLaboral} {$entradaStr}", $tz);
+
+        $tolerancia = $this->tolerancia_minutos !== null
+            ? (int) $this->tolerancia_minutos
+            : (int) ($toleranciaFallback ?? config('services.biometrico.tolerancia_default', 10));
+
+        $limite = $esperada->copy()->addMinutes(max(0, $tolerancia));
+
+        if ($horaEntrada->lte($limite)) {
+            return 0;
+        }
+
+        return (int) max(1, $esperada->diffInMinutes($horaEntrada));
     }
 }

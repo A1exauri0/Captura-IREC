@@ -40,4 +40,10 @@ return [
         'token' => env('STELLUM_BRIDGE_TOKEN', ''),
     ],
 
+    'biometrico' => [
+        'token'              => env('BIOMETRICO_API_TOKEN', ''),
+        'antirebote_minutos' => (int) env('BIOMETRICO_ANTIREBOTE_MINUTOS', 5),
+        'tolerancia_default' => (int) env('BIOMETRICO_TOLERANCIA_MINUTOS', 10),
+    ],
+
 ];
