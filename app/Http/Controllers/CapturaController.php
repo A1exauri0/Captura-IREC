@@ -14,6 +14,7 @@ use App\Models\Municipios;
 use App\Models\Localidades;
 use App\Models\AsignacionCapturaUsuario;
 use App\Models\CatalogoInconsistencia;
+use App\Services\PdfCacheService;
 use App\Services\PdfService;
 use App\Services\RutaPropuestaService;
 use App\Services\StellumBridgeService;
@@ -755,6 +756,11 @@ class CapturaController extends Controller
      * Sirve un PDF exclusivamente desde indice_archivos_pdfs vía proxy server-side hacia Stellum
      * (mismo origen para el iframe, sin CORS y sin exponer STELLUM_BRIDGE_TOKEN al navegador).
      */
+    /**
+     * Sirve un PDF de indice_archivos_pdfs desde el caché local SSD (vía Nginx X-Accel-Redirect en producción
+     * con soporte nativo de Range 206, o response()->file() en local), descargándolo en streaming desde Stellum
+     * si aún no estaba pre-descargado.
+     */
     public function verPdf(Request $request)
     {
         $ruta = (string) $request->query('ruta', '');
@@ -762,18 +768,33 @@ class CapturaController extends Controller
         if (str_starts_with($ruta, 'stellum:')) {
             $indiceId = (int) substr($ruta, 8);
             if ($indiceId > 0) {
-                $bridge = app(StellumBridgeService::class);
-                $resp = $bridge->obtenerStreamPdf($indiceId);
+                $cache = app(PdfCacheService::class);
+                $res = $cache->asegurarEnCache($indiceId, 95);
 
-                if (!$resp->successful()) {
-                    abort($resp->status() === 404 ? 404 : 502, 'No se pudo obtener el PDF desde Stellum.');
+                if (!$res['ok'] || empty($res['path'])) {
+                    $status = (int) ($res['status'] ?? 502);
+                    if ($status === 404) {
+                        abort(404, 'PDF no encontrado en Stellum.');
+                    }
+                    if ($status === 504) {
+                        abort(504, 'Tiempo de espera agotado al obtener el PDF desde Stellum.');
+                    }
+                    abort(502, 'No se pudo obtener el PDF desde Stellum.');
                 }
 
-                return response($resp->body(), 200, [
+                $headers = [
                     'Content-Type'        => 'application/pdf',
-                    'Content-Disposition' => 'inline; filename="documento.pdf"',
+                    'Content-Disposition' => 'inline; filename="documento_' . $indiceId . '.pdf"',
                     'Cache-Control'       => 'private, max-age=300',
-                ]);
+                ];
+
+                if (config('services.stellum_bridge.pdf_cache_xaccel', false)) {
+                    $headers['X-Accel-Redirect'] = '/_internal_pdf_cache/' . $indiceId . '.pdf';
+
+                    return response('', 200, $headers);
+                }
+
+                return response()->file($res['path'], $headers);
             }
         }
 

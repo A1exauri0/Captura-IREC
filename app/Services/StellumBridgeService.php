@@ -104,14 +104,54 @@ class StellumBridgeService
 
     /**
      * Descarga el contenido binario del PDF desde Stellum para servirlo vía proxy (mismo origen, sin exponer token).
+     * Envía el token únicamente por header Authorization: Bearer para evitar filtrarlo en logs de URL.
      */
     public function obtenerStreamPdf(int $indicePdfId)
     {
         return Http::withToken($this->token)
             ->timeout(90)
-            ->get($this->baseUrl . '/indice-pdfs/' . $indicePdfId . '/stream', [
-                'bridge_token' => $this->token,
+            ->get($this->baseUrl . '/indice-pdfs/' . $indicePdfId . '/stream');
+    }
+
+    /**
+     * Descarga un PDF desde Stellum en streaming directo a disco (sin cargar el archivo completo en RAM).
+     */
+    public function descargarPdfAArchivo(int $indicePdfId, string $destinoPath, int $timeoutSeconds = 120): array
+    {
+        if ($this->baseUrl === '' || !preg_match('#^https?://#i', $this->baseUrl)) {
+            return ['ok' => false, 'status' => 502, 'error' => 'STELLUM_BRIDGE_URL no configurada en .env'];
+        }
+
+        $url = $this->baseUrl . '/indice-pdfs/' . $indicePdfId . '/stream';
+
+        try {
+            $response = Http::withToken($this->token)
+                ->timeout($timeoutSeconds)
+                ->sink($destinoPath)
+                ->get($url);
+
+            if ($response->successful()) {
+                return ['ok' => true, 'status' => $response->status(), 'error' => null];
+            }
+
+            return [
+                'ok'     => false,
+                'status' => $response->status(),
+                'error'  => 'HTTP ' . $response->status(),
+            ];
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::warning('StellumBridgeService::descargarPdfAArchivo timeout/conexión', [
+                'indice_pdf_id' => $indicePdfId,
+                'mensaje'       => $e->getMessage(),
             ]);
+            return ['ok' => false, 'status' => 504, 'error' => 'Timeout o error de conexión con Stellum'];
+        } catch (\Throwable $e) {
+            Log::warning('StellumBridgeService::descargarPdfAArchivo error', [
+                'indice_pdf_id' => $indicePdfId,
+                'mensaje'       => $e->getMessage(),
+            ]);
+            return ['ok' => false, 'status' => 502, 'error' => $e->getMessage()];
+        }
     }
 
     /**
