@@ -36,8 +36,19 @@ return [
     ],
 
     'stellum_bridge' => [
-        'url'   => env('STELLUM_BRIDGE_URL', ''),
-        'token' => env('STELLUM_BRIDGE_TOKEN', ''),
+        'url'              => env('STELLUM_BRIDGE_URL', ''),
+        'token'            => env('STELLUM_BRIDGE_TOKEN', ''),
+        'pdf_cache_dir'    => env('PDF_CACHE_DIR', storage_path('app/pdf-cache')),
+        'pdf_cache_max_mb' => (int) env('PDF_CACHE_MAX_MB', 20480),
+        'pdf_cache_ttl_h'  => (int) env('PDF_CACHE_TTL_HOURS', 12),
+        'pdf_cache_xaccel' => (bool) env('PDF_CACHE_XACCEL', false),
+        'pdf_prefetch_buf' => (int) env('PDF_PREFETCH_BUFFER', 60),
+    ],
+
+    'biometrico' => [
+        'token'              => env('BIOMETRICO_API_TOKEN', ''),
+        'antirebote_minutos' => (int) env('BIOMETRICO_ANTIREBOTE_MINUTOS', 5),
+        'tolerancia_default' => (int) env('BIOMETRICO_TOLERANCIA_MINUTOS', 10),
     ],
 
 ];

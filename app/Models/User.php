@@ -50,4 +50,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(PeticionAutorizacion::class, 'user_id');
     }
+
+    public function huellas()
+    {
+        return $this->hasMany(Huella::class, 'user_id');
+    }
+
+    public function huellasActivas()
+    {
+        return $this->hasMany(Huella::class, 'user_id')->where('activo', true);
+    }
+
+    public function asistencias()
+    {
+        return $this->hasMany(Asistencia::class, 'user_id');
+    }
 }
