@@ -64,10 +64,16 @@ const CapturaArchivos = (() => {
      * @param {number} delegacionId  - ID de la delegación en la BD.
      * @returns {Promise<{ ok, lote, archivos, mensaje }>}
      */
-    async function buscarPdf(disco, delegacionId) {
+    async function buscarPdf(disco, delegacionId, opciones = {}) {
         const params = new URLSearchParams();
         if (disco) params.append('disco', disco);
         if (delegacionId) params.append('delegacion_id', delegacionId);
+        if (opciones && opciones.prefetch) {
+            params.append('prefetch', '1');
+        }
+        if (typeof window !== 'undefined' && window.MODO_OPERACION_CAPTURA === 'muestreo') {
+            params.append('modo', 'muestreo');
+        }
         return getJSON(`/captura/buscar-pdf?${params.toString()}`);
     }
 
@@ -91,6 +97,19 @@ const CapturaArchivos = (() => {
      */
     async function renombrar(disco, rutaOriginal, nuevoNombre, extra = {}) {
         return postJSON('/captura/renombrar', {
+            disco,
+            ruta_original: rutaOriginal,
+            nuevo_nombre: nuevoNombre,
+            ...extra,
+        });
+    }
+
+    /**
+     * Registra un sello adicional agregado sobre el mismo PDF y verifica en indice_archivos_pdfs
+     * si ya existe un PDF con ese nombre para enviarlo a revisión indicando el motivo.
+     */
+    async function agregarSello(disco, rutaOriginal, nuevoNombre, extra = {}) {
+        return postJSON('/captura/agregar-sello', {
             disco,
             ruta_original: rutaOriginal,
             nuevo_nombre: nuevoNombre,
@@ -158,6 +177,38 @@ const CapturaArchivos = (() => {
     }
 
     /**
+     * Marca el archivo actual para mover a Libros (solo registro en BD, sin movimiento físico).
+     */
+    async function moverLibros(disco, rutaArchivo, extra = {}) {
+        return postJSON('/captura/mover-libros', {
+            disco,
+            ruta_archivo: rutaArchivo,
+            ...extra,
+        });
+    }
+
+    /**
+     * Marca un archivo como eliminar en BD (sin borrar el archivo físico), previa autorización.
+     */
+    async function eliminar(disco, rutaArchivo, extra = {}) {
+        return postJSON('/captura/eliminar', {
+            disco,
+            ruta_archivo: rutaArchivo,
+            ...extra,
+        });
+    }
+
+    /**
+     * Pospone ("skipea") el PDF actual para liberarlo al día siguiente en el mismo turno del usuario.
+     */
+    async function posponerPdf(sesionId, motivo = '') {
+        return postJSON('/captura/posponer-pdf', {
+            sesion_id: sesionId,
+            motivo,
+        });
+    }
+
+    /**
      * Rota una página específica de un PDF.
      *
      * @param {string} disco       - Disco de red.
@@ -182,7 +233,7 @@ const CapturaArchivos = (() => {
 
     // API pública
     return {
-        buscarPdf, urlVerPdf, renombrar, duplicar, validar,
-        moverInconsistencia, moverSellos, rotar, liberarLote,
+        buscarPdf, urlVerPdf, renombrar, agregarSello, duplicar, validar,
+        moverInconsistencia, moverSellos, moverLibros, eliminar, posponerPdf, rotar, liberarLote,
     };
 })();

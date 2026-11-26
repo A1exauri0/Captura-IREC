@@ -11,6 +11,7 @@ use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\PeticionAutorizacionController;
 use App\Http\Controllers\AccesoController;
 use App\Http\Controllers\FlujoStellumController;
+use App\Http\Controllers\MuestreoController;
 use App\Http\Controllers\InventarioEquiposController;
 use App\Http\Controllers\DashboardAvanceController;
 use App\Http\Controllers\PcCapturaController;
@@ -49,9 +50,13 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/ver-pdf', [CapturaController::class, 'verPdf'])->name('verPdf');
             Route::get('/localidades', [CapturaController::class, 'obtenerLocalidades'])->name('localidades');
             Route::post('/renombrar', [CapturaController::class, 'renombrar'])->name('renombrar');
+            Route::post('/agregar-sello', [CapturaController::class, 'agregarSello'])->name('agregarSello');
             Route::post('/validar', [CapturaController::class, 'validar'])->name('validar');
             Route::post('/duplicar', [CapturaController::class, 'duplicar'])->name('duplicar');
             Route::post('/inconsistencia', [CapturaController::class, 'inconsistencia'])->name('inconsistencia');
+            Route::post('/mover-libros', [CapturaController::class, 'moverLibros'])->name('moverLibros');
+            Route::post('/eliminar', [CapturaController::class, 'eliminar'])->name('eliminar');
+            Route::post('/posponer-pdf', [CapturaController::class, 'posponerPdf'])->name('posponerPdf');
             Route::post('/rotar', [CapturaController::class, 'rotar'])->name('rotar');
             Route::post('/liberar-lote', [CapturaController::class, 'liberarLote'])->name('liberarLote');
             Route::post('/auditoria', [CapturaController::class, 'auditoria'])->name('auditoria');
@@ -204,6 +209,14 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [CatalogoController::class, 'storeCatalogoInconsistencia'])->name('store');
             Route::put('/{id}', [CatalogoController::class, 'updateCatalogoInconsistencia'])->name('update');
             Route::delete('/{id}', [CatalogoController::class, 'destroyCatalogoInconsistencia'])->name('destroy');
+        });
+
+        // Gestión de Muestreo de Calidad (por Fecha Laboral y Turno sobre auditoria_sellos)
+        Route::name('admin.muestreo.')->prefix('muestreo')->group(function () {
+            Route::get('/', [MuestreoController::class, 'index'])->name('index');
+            Route::post('/generar', [MuestreoController::class, 'generar'])->name('generar');
+            Route::get('/{id}/detalle', [MuestreoController::class, 'detalle'])->name('detalle');
+            Route::delete('/{id}', [MuestreoController::class, 'destroy'])->name('destroy');
         });
 
         // Flujo Solo-BD + Stellum: Inconsistencias (R01-R09), Colisiones (revisar=1), Aprobación Masiva y Asignaciones

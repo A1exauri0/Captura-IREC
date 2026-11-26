@@ -61,6 +61,9 @@
                     <label class="small font-weight-bold mb-1">Tipo de Solicitud:</label>
                     <select id="filtroTipoPeticion" class="form-control form-control-sm">
                         <option value="">Todos los tipos</option>
+                        <option value="Cambio de delegación">Cambio de delegación</option>
+                        <option value="Posponer PDF">Posponer / Skipear PDF</option>
+                        <option value="Eliminar PDF">Eliminar PDF duplicado</option>
                         <option value="Inconsistencia">Inconsistencia de PDF</option>
                         <option value="Mover a Sellos">Mover a Sellos</option>
                         <option value="Liberar Lote">Liberar Lote</option>
@@ -265,8 +268,9 @@ $(document).ready(function() {
             cancelButtonText: 'Cancelar'
         }).then((result) => {
             if (result.isConfirmed) {
+                const baseResolverUrl = "{{ url('/admin/autorizaciones') }}";
                 $.ajax({
-                    url: `/autorizaciones/${id}/resolver`,
+                    url: `${baseResolverUrl}/${id}/resolver`,
                     type: 'POST',
                     data: {
                         _token: "{{ csrf_token() }}",
@@ -282,6 +286,17 @@ $(document).ready(function() {
                             title: res.mensaje,
                             showConfirmButton: false,
                             timer: 2500
+                        });
+                    },
+                    error: function(xhr) {
+                        const msg = (xhr.responseJSON && xhr.responseJSON.mensaje) || 'No se pudo resolver la petición.';
+                        Swal.fire({
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'error',
+                            title: msg,
+                            showConfirmButton: false,
+                            timer: 3000
                         });
                     }
                 });

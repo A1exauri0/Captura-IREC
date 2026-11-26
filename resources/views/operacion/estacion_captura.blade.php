@@ -19,10 +19,15 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Módulos JS de captura -->
-    <script src="{{ asset('js/captura/capturaReglas.js') }}"></script>
-    <script src="{{ asset('js/captura/capturaArchivos.js') }}"></script>
+    <script>
+        window.MODO_OPERACION_CAPTURA = @json($modoOperacion ?? 'captura');
+        window.ES_ADMIN_CAPTURA = @json(auth()->user()?->hasAnyRole(['superadmin', 'administrador']) ?? false);
+        window.REGLAS_DIGITOS_SELLOS = @json($reglasDigitosSellos ?? []);
+    </script>
+    <script src="{{ asset('js/captura/capturaReglas.js') }}?v={{ filemtime(public_path('js/captura/capturaReglas.js')) }}"></script>
+    <script src="{{ asset('js/captura/capturaArchivos.js') }}?v={{ filemtime(public_path('js/captura/capturaArchivos.js')) }}"></script>
     <script src="{{ asset('js/captura/capturaAuditoria.js') }}"></script>
-    <script src="{{ asset('js/captura/capturaProcesos.js') }}"></script>
+    <script src="{{ asset('js/captura/capturaProcesos.js') }}?v={{ filemtime(public_path('js/captura/capturaProcesos.js')) }}"></script>
 </head>
 
 <body
@@ -100,6 +105,23 @@
                 <button type="button" onclick="seleccionarPresetVisor('normal')" class="text-slate-400 hover:text-white text-[10px] px-1" title="Restablecer filtros a Normal">
                     <i class="fa-solid fa-rotate-left"></i>
                 </button>
+
+                <!-- Rotación física de página integrada en la barra del visor PDF -->
+                <div class="flex items-center gap-1 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700 ml-1" title="Rotar página del PDF">
+                    <span class="text-slate-400 text-[10px] font-semibold">Rotar:</span>
+                    <button id="btnRotarIzquierda" type="button" title="Rotar página -90°"
+                        class="w-6 h-6 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-600 text-[11px] transition">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <span class="text-slate-400 text-[10px] ml-0.5">Pág</span>
+                    <input type="number" id="nudPagina" min="1" value="1"
+                        class="w-11 px-1 py-0.5 text-center text-[11px] font-mono font-bold bg-slate-800 text-white border border-slate-600 rounded focus:outline-none focus:border-sky-400">
+                    <button id="btnRotarDerecha" type="button" title="Rotar página +90°"
+                        class="w-6 h-6 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-600 text-[11px] transition">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+
                 <!-- Reloj grande del Servidor (arriba a la derecha) -->
                 <div class="flex items-center gap-1.5 bg-slate-900 px-3 py-0.5 rounded-lg border border-sky-500/50 shadow-sm ml-1" title="Hora oficial del servidor ({{ $servidorZonaHoraria ?? 'America/Mexico_City' }})">
                     <i class="fa-regular fa-clock text-sky-400 text-sm"></i>
@@ -118,7 +140,7 @@
         </div>
 
         <!-- Visor de PDF -->
-        <iframe class="flex-grow w-full border-none bg-white dark:bg-slate-900" id="pdfViewer" src="about:blank"></iframe>
+        <iframe class="grow w-full border-none bg-white dark:bg-slate-900" id="pdfViewer" src="about:blank"></iframe>
 
         <!-- Splitter -->
         <div
@@ -136,144 +158,161 @@
             <!-- Input maestro oculto para compatibilidad con CapturaReglas / CapturaProcesos -->
             <input type="text" id="txtNombre" autocomplete="off" class="hidden">
 
-            <!-- FILA 1: Estado, Preview compacto y Utilidades (Sin botón Config ni rutas visibles) -->
+            <!-- FILA 1: Estado y Preview a la izquierda | Utilidades (Siguiente, Oscuro, Actualizar, Salir) a la derecha arriba de los botones 2x2 -->
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex flex-wrap items-center gap-3 min-w-0">
+                <div class="flex flex-wrap items-center gap-2.5 min-w-0">
+                    @if(($modoOperacion ?? 'captura') === 'muestreo')
+                        <span id="badgeModoOperacion" class="px-2.5 py-0.5 rounded-full bg-purple-600 text-white text-xs font-extrabold tracking-wide shadow-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-vial-circle-check"></i> MODO MUESTREO (CALIDAD)
+                        </span>
+                    @else
+                        <span id="badgeModoOperacion" class="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-xs font-extrabold tracking-wide shadow-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-keyboard"></i> MODO CAPTURA
+                        </span>
+                    @endif
                     <span class="text-sm font-bold text-gray-900 dark:text-gray-100" id="lblTotalPdf">Cargando PDF...</span>
                     <span class="px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 text-xs font-bold" id="lblCaptura">Primera captura</span>
                     <code id="lblPreviewNombreSellos" class="px-2.5 py-0.5 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-xs font-mono font-bold text-gray-800 dark:text-gray-100">—</code>
                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300" id="lblEstado">Listo para capturar</span>
                 </div>
 
-                <div class="flex items-center gap-2 shrink-0">
-                    @if(auth()->user()?->hasAnyRole(['superadmin', 'administrador']))
-                        <button id="btnAdminSiguiente" type="button" title="Saltar al siguiente PDF libre (solo Administrador)"
-                            class="h-8 px-2.5 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded border border-sky-700 flex items-center gap-1.5">
+                <div class="flex items-center justify-end gap-1.5 shrink-0">
+                    @if(($modoOperacion ?? 'captura') !== 'muestreo')
+                        <button id="btnAdminSiguiente" type="button"
+                            title="{{ auth()->user()?->hasAnyRole(['superadmin', 'administrador']) ? 'Pasar al siguiente PDF libre' : 'Solicitar autorización para posponer y pasar al siguiente PDF' }}"
+                            class="h-8 px-2.5 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-md border border-sky-700 shadow-sm flex items-center gap-1.5 transition-colors">
                             <i class="fa-solid fa-forward-step"></i> Siguiente
                         </button>
+                    @endif
+                    @if(auth()->user()?->hasAnyRole(['superadmin', 'administrador']))
                         <button id="btnAdminBuscarHash" type="button" title="Buscar un grupo de varios PDFs con el mismo hash (solo Administrador)"
-                            class="h-8 px-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded border border-indigo-700 flex items-center gap-1.5">
+                            class="h-8 px-2.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-md border border-indigo-700 shadow-sm flex items-center gap-1.5 transition-colors">
                             <i class="fa-solid fa-layer-group"></i> Mismo Hash
                         </button>
                     @endif
-
-                    <!-- Rotación física con página editable -->
-                    <div class="flex items-center gap-1 bg-white dark:bg-gray-900 px-2 py-1 rounded border border-gray-300 dark:border-gray-600">
-                        <span class="text-xs font-bold text-gray-600 dark:text-gray-300 mr-1">Rotar:</span>
-                        <button id="btnRotarIzquierda" title="Rotar página -90°"
-                            class="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300 dark:border-gray-600 text-xs">
-                            <i class="fa-solid fa-rotate-left"></i>
-                        </button>
-                        <button id="btnRotarDerecha" title="Rotar página +90°"
-                            class="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded border border-gray-300 dark:border-gray-600 text-xs">
-                            <i class="fa-solid fa-rotate-right"></i>
-                        </button>
-                        <span class="text-xs text-gray-500 ml-1">Pág</span>
-                        <input type="number" id="nudPagina" min="1" value="1"
-                            class="w-12 px-1 py-0.5 text-center text-xs font-bold bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand">
-                    </div>
-
                     <button id="btnModo" title="Cambiar tema"
-                        class="h-8 px-2.5 text-xs font-semibold bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 flex items-center gap-1.5">
+                        class="h-8 px-2.5 text-xs font-semibold bg-[#404040] hover:bg-gray-600 text-white rounded-md border border-gray-700 flex items-center gap-1.5 transition-colors">
                         <i class="fa-solid fa-moon"></i> Oscuro
                     </button>
                     <button id="btnRefrescar" title="Refrescar visor"
-                        class="w-8 h-8 flex items-center justify-center bg-[#404040] hover:bg-gray-600 text-white rounded border border-gray-700 text-xs">
+                        class="w-8 h-8 flex items-center justify-center bg-[#404040] hover:bg-gray-600 text-white rounded-md border border-gray-700 text-xs transition-colors">
                         <i class="fa-solid fa-sync"></i>
                     </button>
                     <button id="btnCerrarSesion"
-                        class="h-8 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded border border-red-800 flex items-center gap-1.5">
+                        class="h-8 px-3 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-md border border-red-800 flex items-center gap-1.5 transition-colors">
                         <i class="fa-solid fa-power-off"></i> Salir
                     </button>
                 </div>
             </div>
 
-            <!-- BARRA DE GRUPO POR MISMO HASH (visible solo cuando hay varios PDFs idénticos con distinto registro) -->
-            <div id="barraGrupoHash" class="hidden flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-700 text-xs">
-                <span class="font-bold text-indigo-800 dark:text-indigo-200 flex items-center gap-1.5">
-                    <i class="fa-solid fa-layer-group"></i>
-                    <span id="lblTituloGrupoHash">Mismo PDF (0 registros):</span>
-                </span>
-                <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5"></div>
-            </div>
+            <!-- FILA 2: Barra de Sellos del PDF actual (Agregar Sello siempre visible + badges de PDFs con el mismo hash) -->
+            @if(($modoOperacion ?? 'captura') !== 'muestreo')
+                <div id="barraGrupoHash" class="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-900/70 border border-gray-300 dark:border-gray-700 text-xs">
+                    <button id="btnAgregarSello" type="button"
+                        class="px-2.5 py-1 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                        title="Agregar un sello adicional sobre el mismo PDF actual (verifica en indice_archivos_pdfs si ya existe)">
+                        <i class="fa-solid fa-plus-circle"></i> Agregar Sello
+                    </button>
+                    <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5"></div>
+                </div>
+            @else
+                <div id="barraGrupoHash" class="hidden flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-900/70 border border-gray-300 dark:border-gray-700 text-xs">
+                    <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5"></div>
+                </div>
+            @endif
 
-            <!-- FILA 2: Solo los 9 Inputs de la Regla de Sellos (Form1.vb: Del, Secc, Libro, Tomo, Vol, Fracc, Año, Inscr, Bis) -->
-            <div class="flex flex-wrap lg:flex-nowrap items-end gap-3">
-                <div class="grid grid-cols-9 gap-2 flex-1 bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 shadow-sm">
-                    <div>
-                        <label for="selloDel" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">1. Del.</label>
-                        <input type="text" id="selloDel" data-idx="0" maxlength="2" value="" autocomplete="off"
-                            class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
+            <!-- HASTA ABAJO: 9 Inputs de Captura auto-expandibles + Botones 2x2 a la derecha -->
+            <div class="w-full relative z-30 flex items-stretch gap-2.5">
+                <div id="contenedorSegsSellos" class="flex flex-wrap xl:flex-nowrap items-end gap-1.5 flex-1 min-w-0 bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 shadow-sm overflow-visible">
+                    <div class="relative shrink-0 w-[76px]">
+                        <div id="menuSelloDel" class="hidden absolute bottom-full mb-1.5 left-0 z-[80] min-w-[260px] max-h-60 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-2xl py-1 text-left"></div>
+                        <div class="flex items-center justify-center gap-1 mb-1">
+                            <label for="selloDel" class="text-[11px] font-bold text-gray-600 dark:text-gray-300">1. Del.</label>
+                            <button type="button" id="btnCambiarDelegacion" tabindex="-1"
+                                title="Solicitar autorización para cambiar delegación"
+                                class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors">
+                                <i id="icoCandadoDel" class="fa-solid fa-lock"></i>
+                            </button>
+                        </div>
+                        <input type="text" id="selloDel" data-idx="0" maxlength="2" value="" autocomplete="off" readonly
+                            class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-sky-50/80 dark:bg-sky-950/40 border-2 border-sky-300 dark:border-sky-700 rounded-lg focus:border-brand focus:outline-none cursor-not-allowed">
                     </div>
-                    <div>
+                    <div class="shrink-0 w-[62px]">
                         <label for="selloSecc" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">2. Secc.</label>
                         <input type="text" id="selloSecc" data-idx="1" maxlength="3" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
-                    <div>
+                    <div class="shrink-0">
                         <label for="selloLibro" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">3. Libro</label>
                         <input type="text" id="selloLibro" data-idx="2" maxlength="6" value="" autocomplete="off"
-                            class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
+                            data-auto-expand="true" data-min-ch="6" data-max-ch="11"
+                            style="width: 6.5ch;"
+                            class="sello-seg px-2 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none transition-[width] duration-100">
                     </div>
-                    <div class="relative">
-                        <div id="menuSelloTomo" class="hidden absolute bottom-full mb-1.5 left-0 z-40 min-w-[240px] max-h-56 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl py-1 text-left"></div>
+                    <div class="relative shrink">
+                        <div id="menuSelloTomo" class="hidden absolute bottom-full mb-1.5 left-0 z-[80] min-w-[260px] max-h-60 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-2xl py-1 text-left"></div>
                         <div class="flex items-center justify-center gap-1 mb-1">
                             <label for="selloTomo" class="text-[11px] font-bold text-gray-600 dark:text-gray-300" title="Escribe para filtrar, ↑/↓ para elegir, Tab/Enter para seleccionar o F2 para ver todo">4. Tomo</label>
                             <button type="button" id="btnToggleMenuTomo" tabindex="-1" title="Ver catálogo de Tomos (F2)" class="text-[10px] px-1 rounded bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 hover:bg-sky-200">▾</button>
                         </div>
                         <input type="text" id="selloTomo" data-idx="3" maxlength="30" value="" autocomplete="off"
-                            class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
+                            data-auto-expand="true" data-min-ch="10" data-max-ch="34"
+                            style="width: 10ch;"
+                            class="sello-seg max-w-full px-2 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none transition-[width] duration-100">
                     </div>
-                    <div>
+                    <div class="shrink-0 w-[60px]">
                         <label for="selloVol" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">5. Vol.</label>
                         <input type="text" id="selloVol" data-idx="4" maxlength="3" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
-                    <div class="relative">
-                        <div id="menuSelloFracc" class="hidden absolute bottom-full mb-1.5 left-0 z-40 min-w-[260px] max-h-56 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl py-1 text-left"></div>
+                    <div class="relative shrink">
+                        <div id="menuSelloFracc" class="hidden absolute bottom-full mb-1.5 left-0 z-[80] min-w-[280px] max-h-60 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-2xl py-1 text-left"></div>
                         <div class="flex items-center justify-center gap-1 mb-1">
                             <label for="selloFracc" class="text-[11px] font-bold text-gray-600 dark:text-gray-300" title="Escribe para filtrar, ↑/↓ para elegir, Tab/Enter para seleccionar o F2 para ver todo">6. Fracc.</label>
                             <button type="button" id="btnToggleMenuFracc" tabindex="-1" title="Ver catálogo de Fraccionamiento (F2)" class="text-[10px] px-1 rounded bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 hover:bg-sky-200">▾</button>
                         </div>
                         <input type="text" id="selloFracc" data-idx="5" maxlength="55" value="" autocomplete="off"
-                            class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
+                            data-auto-expand="true" data-min-ch="12" data-max-ch="44"
+                            style="width: 12ch;"
+                            class="sello-seg max-w-full px-2 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none transition-[width] duration-100">
                     </div>
-                    <div>
+                    <div class="shrink-0 w-[72px]">
                         <label for="selloAnio" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">7. Año</label>
                         <input type="text" id="selloAnio" data-idx="6" maxlength="4" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
-                    <div>
+                    <div class="shrink-0 w-[74px]">
                         <label for="selloInscr" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">8. Inscr.</label>
                         <input type="text" id="selloInscr" data-idx="7" maxlength="4" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
-                    <div>
+                    <div class="shrink-0 w-[62px]">
                         <label for="selloBis" class="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1 text-center">9. Bis</label>
                         <input type="text" id="selloBis" data-idx="8" maxlength="3" value="" autocomplete="off"
                             class="sello-seg w-full px-1.5 py-2 text-center font-mono font-bold text-base bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-brand focus:bg-white dark:focus:bg-gray-700 focus:outline-none">
                     </div>
                 </div>
 
-                <!-- Botones de Acción Principales -->
-                <div class="flex items-center gap-2 shrink-0 pb-1">
+                <!-- Botones Principales en Cuadrícula 2x2 a la derecha de los inputs -->
+                <div class="grid grid-cols-2 gap-1.5 shrink-0 w-[290px]">
                     <button id="btnRenombrar"
-                        class="px-5 py-2.5 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow transition-colors">
-                        <i class="fa-solid fa-check mr-1"></i> Renombrar
+                        class="px-3 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow transition-colors flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-check"></i> Renombrar
                     </button>
-                    {{-- Botón Duplicar comentado temporalmente
-                    <button id="btnDuplicar"
-                        class="px-4 py-2.5 text-sm font-bold bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow transition-colors">
-                        <i class="fa-solid fa-copy mr-1"></i> Duplicar
-                    </button>
-                    --}}
-                    <button id="btnInconsistencia"
-                        class="px-4 py-2.5 text-sm font-bold bg-amber-400 hover:bg-amber-500 text-black rounded-lg border border-amber-500 shadow transition-colors">
-                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> Inconsistencia
-                    </button>
+                    @if(($modoOperacion ?? 'captura') !== 'muestreo')
+                        <button id="btnMoverLibros" type="button"
+                            class="px-3 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow transition-colors flex items-center justify-center gap-1.5"
+                            title="Marcar este PDF para mover a Libros (solo registro en BD)">
+                            <i class="fa-solid fa-book"></i> Mover a Libros
+                        </button>
+                        <button id="btnInconsistencia"
+                            class="px-3 py-2 text-xs font-bold bg-amber-400 hover:bg-amber-500 text-black rounded-lg border border-amber-500 shadow transition-colors flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Inconsistencia
+                        </button>
+                    @endif
                     <button id="btnLimpiar" title="Limpiar campos"
-                        class="px-3 py-2.5 text-sm font-semibold bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 transition-colors">
-                        <i class="fa-solid fa-eraser"></i>
+                        class="px-3 py-2 text-xs font-semibold bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-300 dark:border-gray-600 transition-colors flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-eraser"></i> Limpiar
                     </button>
                 </div>
             </div>
@@ -287,13 +326,12 @@
             <div class="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
                 <i class="fa-solid fa-shield-halved text-brand text-2xl"></i>
                 <div>
-                    <h3 class="font-bold text-lg leading-tight">Autorización en Tiempo Real</h3>
-                    <span class="text-xs text-gray-500">Supervisión en Vivo (WebSockets)</span>
+                    <h3 class="font-bold text-lg leading-tight">Autorización</h3>
                 </div>
             </div>
             <div id="panelFormularioPeticion">
                 <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                    Describa brevemente el motivo para enviar la petición de autorización al supervisor en tiempo real:
+                    Describa brevemente el motivo para enviar la petición de autorización al supervisor:
                 </p>
                 <input type="text" id="txtPinMaestro" placeholder="Motivo (ej. PDF ilegible / Inconsistencia)..." autocomplete="off"
                     class="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:border-brand mb-4 text-gray-900 dark:text-white">
@@ -551,6 +589,8 @@
         // ==================================================
         let pinResolve = null;
         let pollPeticionTimer = null;
+        let tipoPeticionActual = 'Inconsistencia';
+        let accionSolicitadaActual = 'Mover archivo a Inconsistencias';
 
         function limpiarTimerPeticion() {
             if (pollPeticionTimer) {
@@ -559,9 +599,19 @@
             }
         }
 
-        function solicitarPinMaestro(tipoPeticion = 'Inconsistencia') {
+        function solicitarPinMaestro(tipoPeticion = 'Inconsistencia', accionSolicitada = null) {
             return new Promise((resolve) => {
                 pinResolve = resolve;
+                tipoPeticionActual = tipoPeticion || 'Inconsistencia';
+                accionSolicitadaActual = accionSolicitada || (
+                    tipoPeticionActual === 'Cambio de delegación'
+                        ? 'Autorizar cambio de delegación en captura'
+                        : (tipoPeticionActual === 'Posponer PDF'
+                            ? 'Autorizar posponer (skipear) PDF para revisar en el siguiente turno'
+                            : (tipoPeticionActual === 'Eliminar PDF'
+                                ? 'Autorizar marcar PDF duplicado como eliminar (solo en BD)'
+                                : 'Mover archivo a Inconsistencias'))
+                );
                 limpiarTimerPeticion();
                 document.getElementById('panelFormularioPeticion').classList.remove('hidden');
                 document.getElementById('panelEsperandoResolucion').classList.add('hidden');
@@ -569,6 +619,13 @@
                 btnPinAceptar.classList.remove('hidden');
                 btnPinAceptar.disabled = false;
                 txtPinMaestro.value = '';
+                txtPinMaestro.placeholder = tipoPeticionActual === 'Cambio de delegación'
+                    ? 'Motivo del cambio de delegación (ej. Sello corresponde a otra delegación)...'
+                    : (tipoPeticionActual === 'Posponer PDF'
+                        ? 'Motivo para skipear/posponer este PDF para mañana en tu turno...'
+                        : (tipoPeticionActual === 'Eliminar PDF'
+                            ? 'Motivo para marcar como eliminar (ej. Registro duplicado con año erróneo)...'
+                            : 'Motivo (ej. PDF ilegible / Inconsistencia)...'));
                 modalPinMaestro.classList.remove('hidden');
                 txtPinMaestro.focus();
             });
@@ -576,7 +633,7 @@
 
         async function procesarPin() {
             const pdfActual = (listaPdfs && listaPdfs[indiceActual]) ? listaPdfs[indiceActual] : null;
-            const motivo = txtPinMaestro.value.trim() || 'Inconsistencia detectada en estación de captura';
+            const motivo = txtPinMaestro.value.trim() || `${tipoPeticionActual} solicitada en estación de captura`;
 
             btnPinAceptar.disabled = true;
             document.getElementById('panelFormularioPeticion').classList.add('hidden');
@@ -592,8 +649,8 @@
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({
-                        tipo_peticion: 'Inconsistencia',
-                        accion_solicitada: 'Mover archivo a Inconsistencias',
+                        tipo_peticion: tipoPeticionActual,
+                        accion_solicitada: accionSolicitadaActual,
                         disco: dirSeleccionado ? dirSeleccionado.id : 'irec',
                         lote: loteActualNombre || 'Lote',
                         archivo_nombre: pdfActual ? (pdfActual.nombre + '.pdf') : '-',
@@ -938,6 +995,9 @@
 
         // Registrar triggers de botones y acciones del flujo
         document.getElementById('btnRenombrar')?.addEventListener('click', () => CapturaProcesos.procesarRenombrar(ctx));
+        document.getElementById('btnAgregarSello')?.addEventListener('click', () => CapturaProcesos.agregarSelloAlPdfActual(ctx));
+        document.getElementById('btnMoverLibros')?.addEventListener('click', () => CapturaProcesos.moverLibros(ctx));
+        document.getElementById('btnPosponerPdf')?.addEventListener('click', () => CapturaProcesos.posponerPdf(ctx));
         // document.getElementById('btnDuplicar')?.addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
         document.getElementById('btnLimpiar')?.addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
         document.getElementById('btnRefrescar')?.addEventListener('click', () => {
@@ -975,6 +1035,12 @@
                 if (data.delegacion) {
                     ctx.delSeleccionada = data.delegacion;
                 }
+                if (ctx.colaPrefetch && ctx.colaPrefetch.resp && ctx.colaPrefetch.resp.lote_id === data.lote_id && ctx.colaPrefetch.blobUrl) {
+                    ctx.blobPrecargadoActual = ctx.colaPrefetch.blobUrl;
+                } else {
+                    ctx.blobPrecargadoActual = null;
+                }
+                ctx.colaPrefetch = null;
                 ctx.loteActualId = data.lote_id;
                 ctx.loteActualNombre = data.lote;
                 ctx.listaPdfs = data.archivos || [];
@@ -989,7 +1055,11 @@
         }
 
         document.getElementById('btnAdminSiguiente')?.addEventListener('click', () => {
-            ejecutarAccionAdminPdf("{{ route('admin.captura.adminSiguiente') }}", "Buscando siguiente PDF...");
+            if (window.ES_ADMIN_CAPTURA) {
+                ejecutarAccionAdminPdf("{{ route('admin.captura.adminSiguiente') }}", "Buscando siguiente PDF...");
+            } else {
+                CapturaProcesos.posponerPdf(ctx);
+            }
         });
         document.getElementById('btnAdminBuscarHash')?.addEventListener('click', () => {
             ejecutarAccionAdminPdf("{{ route('admin.captura.adminBuscarMismoHash') }}", "Buscando grupo de PDFs con el mismo hash...");
@@ -1080,6 +1150,9 @@
                 if (!campo || !opcion) return;
                 const maxLen = parseInt(campo.getAttribute('maxlength') || '55', 10);
                 campo.value = opcion.slice(0, maxLen);
+                if (typeof window.ajustarAnchoInputDinamico === 'function') {
+                    window.ajustarAnchoInputDinamico(campo);
+                }
                 cerrarMenuCatalogo(idx);
                 construirNombreSellos();
                 campos[idx + 1]?.focus();
@@ -1229,14 +1302,39 @@
                     if (idx === 3 || idx === 5) cerrarMenuCatalogo(idx);
                 });
 
-                campo.addEventListener('input', () => {
+                campo.addEventListener('input', (e) => {
                     let limpio = CapturaReglas.sanitizarTexto(campo.value);
                     if (idx === 3 || idx === 5) {
                         limpio = limpio.replace(/\s+/g, '_');
-                        actualizarMenuCatalogo(idx, limpio, false);
+                        // Solo abrir el menú desplegable cuando el usuario escribe manualmente,
+                        // NO cuando se precarga el valor al seleccionar un PDF de la barra de mismo hash
+                        if (e && e.isTrusted) {
+                            actualizarMenuCatalogo(idx, limpio, false);
+                        } else {
+                            cerrarMenuCatalogo(idx);
+                        }
                     }
                     if (campo.value !== limpio) campo.value = limpio;
 
+                    /*
+                     * TODO [DETECCIÓN AUTOMÁTICA DE FRACCIONAMIENTOS Y COLONIAS POR LIBRO]:
+                     * Cuando se llene CATALOGO_FRACCIONAMIENTO_POR_LIBRO en capturaReglas.js,
+                     * al escribir en 3. Libro (idx === 2) se detectará y autoseleccionará
+                     * automáticamente el Fraccionamiento o Colonia correspondiente en 6. Fracc. (campos[5]).
+                     */
+                    if (idx === 2 && typeof CapturaReglas.detectarFraccionamientoPorLibro === 'function') {
+                        const fraccAuto = CapturaReglas.detectarFraccionamientoPorLibro(
+                            campo.value,
+                            campos[0]?.value || '',
+                            campos[1]?.value || ''
+                        );
+                        if (fraccAuto && campos[5]) {
+                            campos[5].value = fraccAuto;
+                            ajustarAnchoInputDinamico(campos[5]);
+                        }
+                    }
+
+                    ajustarAnchoInputDinamico(campo);
                     construirNombreSellos();
 
                     // Saltos automáticos idénticos a Form1.vb línea 5213
@@ -1332,7 +1430,10 @@
                     } else if (retrocede && idx > 0) {
                         e.preventDefault();
                         e.stopPropagation();
-                        const prev = campos[idx - 1];
+                        let prevIdx = idx - 1;
+                        while (prevIdx > 0 && campos[prevIdx].readOnly) prevIdx--;
+                        if (campos[prevIdx].readOnly) return;
+                        const prev = campos[prevIdx];
                         if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'ArrowLeft') {
                             mantenerCursorAlFinal = true;
                             prev.focus();
@@ -1346,15 +1447,174 @@
                 });
             });
 
-            // Al presionar Limpiar, vaciar todos los segmentos y enfocar el primer campo
-            document.getElementById('btnLimpiar')?.addEventListener('click', () => {
-                campos.forEach(c => { c.value = ''; });
+            // =========================================================================
+            // AUTO-EXPANSIÓN DE INPUTS DE TEXTO (Libro, Tomo, Fraccionamiento)
+            // =========================================================================
+            function ajustarAnchoInputDinamico(el) {
+                if (!el || el.dataset.autoExpand !== 'true') return;
+                const minCh = parseInt(el.dataset.minCh || '8', 10);
+                const maxCh = parseInt(el.dataset.maxCh || '46', 10);
+                const len = (el.value || '').length;
+                const targetCh = Math.min(maxCh, Math.max(minCh, len + 3));
+                el.style.width = targetCh + 'ch';
+            }
+
+            function ajustarTodosInputsDinamicos() {
+                document.querySelectorAll('input[data-auto-expand="true"]').forEach(ajustarAnchoInputDinamico);
+            }
+            window.ajustarAnchoInputDinamico = ajustarAnchoInputDinamico;
+            window.ajustarTodosInputsDinamicos = ajustarTodosInputsDinamicos;
+
+            // =========================================================================
+            // CATÁLOGO DE DELEGACIONES + AUTO-DETECCIÓN + AUTORIZACIÓN PARA CAMBIAR
+            // =========================================================================
+            const CATALOGO_DELEGACIONES = @json($delegaciones ?? []);
+            const menuSelloDel = document.getElementById('menuSelloDel');
+            const btnCambiarDelegacion = document.getElementById('btnCambiarDelegacion');
+            const icoCandadoDel = document.getElementById('icoCandadoDel');
+            const inputDel = campos[0];
+
+            function cerrarMenuDelegaciones() {
+                if (menuSelloDel) menuSelloDel.classList.add('hidden');
+            }
+
+            function establecerBloqueoDelegacion(desbloqueado) {
+                if (!inputDel) return;
+                ctx.delegacionDesbloqueada = !!desbloqueado;
+                inputDel.readOnly = !desbloqueado;
+                if (desbloqueado) {
+                    inputDel.classList.remove('bg-sky-50/80', 'dark:bg-sky-950/40', 'border-sky-300', 'dark:border-sky-700', 'cursor-not-allowed');
+                    inputDel.classList.add('bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-500');
+                    if (icoCandadoDel) icoCandadoDel.className = 'fa-solid fa-lock-open text-emerald-700 dark:text-emerald-300';
+                    if (btnCambiarDelegacion) btnCambiarDelegacion.title = 'Elegir delegación del catálogo (autorizado)';
+                } else {
+                    inputDel.classList.remove('bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-500');
+                    inputDel.classList.add('bg-sky-50/80', 'dark:bg-sky-950/40', 'border-sky-300', 'dark:border-sky-700', 'cursor-not-allowed');
+                    if (icoCandadoDel) icoCandadoDel.className = 'fa-solid fa-lock';
+                    if (btnCambiarDelegacion) btnCambiarDelegacion.title = 'Solicitar autorización para cambiar delegación';
+                    cerrarMenuDelegaciones();
+                }
+            }
+
+            function renderMenuDelegaciones() {
+                if (!menuSelloDel) return;
+                const claveActual = (inputDel?.value || '').trim();
+                menuSelloDel.innerHTML = '';
+                CATALOGO_DELEGACIONES.forEach((d) => {
+                    const clave = String(d.clave ?? d.id ?? '').padStart(2, '0');
+                    const activo = clave === claveActual;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'w-full text-left px-2.5 py-1.5 text-xs font-mono font-bold transition-colors flex items-center justify-between ' +
+                        (activo
+                            ? 'bg-sky-600 text-white'
+                            : 'text-gray-800 dark:text-gray-100 hover:bg-sky-50 dark:hover:bg-gray-700');
+                    btn.innerHTML = `<span>${clave} - ${d.nombre}</span>${activo ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}`;
+                    btn.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        inputDel.value = clave;
+                        ctx.delSeleccionada = { id: d.id, clave, nombre: d.nombre };
+                        cerrarMenuDelegaciones();
+                        construirNombreSellos();
+                        campos[1]?.focus();
+                    });
+                    menuSelloDel.appendChild(btn);
+                });
+                menuSelloDel.classList.remove('hidden');
+            }
+
+            window.aplicarDelegacionDetectada = function(ctxRef, mantenerDesbloqueo = false) {
+                if (!inputDel) return;
+                const pdf = (ctxRef && ctxRef.listaPdfs && ctxRef.indiceActual >= 0) ? ctxRef.listaPdfs[ctxRef.indiceActual] : null;
+                let claveDetectada = '';
+                let delEncontrada = null;
+
+                if (pdf && (pdf.nombre || pdf.nombre_base_pdf)) {
+                    const m = String(pdf.nombre || pdf.nombre_base_pdf).match(/^(\d{2})[_-]/);
+                    if (m) {
+                        claveDetectada = m[1];
+                        delEncontrada = CATALOGO_DELEGACIONES.find(d => String(d.clave ?? d.id).padStart(2, '0') === claveDetectada) || null;
+                    }
+                }
+                if (!claveDetectada && ctxRef && ctxRef.delSeleccionada && ctxRef.delSeleccionada.clave) {
+                    claveDetectada = String(ctxRef.delSeleccionada.clave).padStart(2, '0');
+                }
+                if (delEncontrada && !mantenerDesbloqueo && ctxRef) {
+                    ctxRef.delSeleccionada = {
+                        id: delEncontrada.id,
+                        clave: String(delEncontrada.clave ?? delEncontrada.id).padStart(2, '0'),
+                        nombre: delEncontrada.nombre
+                    };
+                }
+
+                // Si ya estaba desbloqueado (ej. pasando a segunda captura tras autorización), conservar la delegación elegida
+                if (mantenerDesbloqueo && ctxRef && ctxRef.delSeleccionada && ctxRef.delSeleccionada.clave) {
+                    inputDel.value = String(ctxRef.delSeleccionada.clave).padStart(2, '0');
+                } else if (claveDetectada) {
+                    inputDel.value = claveDetectada;
+                }
+
+                establecerBloqueoDelegacion(mantenerDesbloqueo);
                 construirNombreSellos();
-                campos[0]?.focus();
+            };
+
+            inputDel?.addEventListener('input', () => {
+                if (inputDel.readOnly) return;
+                const val = inputDel.value.trim();
+                if (/^\d{2}$/.test(val)) {
+                    const encontrada = CATALOGO_DELEGACIONES.find(d => String(d.clave ?? d.id).padStart(2, '0') === val);
+                    if (encontrada) {
+                        ctx.delSeleccionada = { id: encontrada.id, clave: val, nombre: encontrada.nombre };
+                    }
+                }
             });
 
+            inputDel?.addEventListener('blur', () => {
+                setTimeout(cerrarMenuDelegaciones, 120);
+            });
+
+            btnCambiarDelegacion?.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (ctx.delegacionDesbloqueada) {
+                    if (menuSelloDel && !menuSelloDel.classList.contains('hidden')) {
+                        cerrarMenuDelegaciones();
+                    } else {
+                        renderMenuDelegaciones();
+                        inputDel?.focus();
+                    }
+                    return;
+                }
+                const autorizado = await solicitarPinMaestro(
+                    'Cambio de delegación',
+                    'Autorizar cambio de delegación en estación de captura'
+                );
+                if (autorizado) {
+                    establecerBloqueoDelegacion(true);
+                    renderMenuDelegaciones();
+                    inputDel?.focus();
+                    inputDel?.select();
+                }
+            });
+
+            // Aplicar maxlength dinámico si fue modificado con `php artisan sellos:ajustar-digitos`
+            if (window.REGLAS_DIGITOS_SELLOS) {
+                const ordenClaves = ['delegacion', 'seccion', 'libro', 'tomo', 'volumen', 'fraccionamiento', 'anio', 'inscripcion', 'bis'];
+                ordenClaves.forEach((k, i) => {
+                    const r = window.REGLAS_DIGITOS_SELLOS[k];
+                    if (r && r.max && campos[i]) {
+                        campos[i].setAttribute('maxlength', String(r.max));
+                    }
+                });
+            }
+
+            // Al presionar Limpiar, delegar en CapturaProcesos.reiniciarCaptura (que ya repuebla la delegación detectada)
+            ajustarTodosInputsDinamicos();
             construirNombreSellos();
-            setTimeout(() => { campos[0]?.focus(); }, 250);
+            setTimeout(() => {
+                if (campos[0] && campos[0].readOnly && campos[1]) campos[1].focus();
+                else campos[0]?.focus();
+            }, 250);
         })();
 
         // Botón Pantalla Completa eliminado por requerimiento operativo
@@ -1532,41 +1792,28 @@
             }
         });
 
-        // Escuchar la tecla Tab para atrapar el foco entre el input y los botones de captura
+        // Escuchar la tecla Tab para regresar al inicio de la captura desde el botón Renombrar
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
-                // Solo atrapar si hay un lote activo (sesión iniciada)
                 if (!loteActualId) return;
 
-                const input = document.getElementById('txtNombre');
                 const btnRenombrar = document.getElementById('btnRenombrar');
-                const btnDuplicar = document.getElementById('btnDuplicar');
+                const selloDel = document.getElementById('selloDel');
+                const selloSecc = document.getElementById('selloSecc');
+                const selloBis = document.getElementById('selloBis');
+                const primerInputEditable = (selloDel && !selloDel.readOnly) ? selloDel : (selloSecc || selloDel);
 
-                // Obtener elementos habilitados del ciclo de captura
-                const elementosFoco = [];
-                if (input) elementosFoco.push(input);
-                if (btnRenombrar && !btnRenombrar.disabled) elementosFoco.push(btnRenombrar);
-                if (btnDuplicar && !btnDuplicar.disabled) elementosFoco.push(btnDuplicar);
-
-                if (elementosFoco.length === 0) return;
-
-                const indice = elementosFoco.indexOf(document.activeElement);
-
-                if (e.shiftKey) {
-                    // Shift + Tab: Navegar hacia atrás
+                if (document.activeElement === btnRenombrar) {
                     e.preventDefault();
-                    if (indice <= 0) {
-                        elementosFoco[elementosFoco.length - 1].focus();
-                    } else {
-                        elementosFoco[indice - 1].focus();
-                    }
-                } else {
-                    // Tab: Navegar hacia adelante
-                    e.preventDefault();
-                    if (indice === -1 || indice >= elementosFoco.length - 1) {
-                        elementosFoco[0].focus();
-                    } else {
-                        elementosFoco[indice + 1].focus();
+                    e.stopPropagation();
+                    if (e.shiftKey) {
+                        if (selloBis) {
+                            selloBis.focus();
+                            selloBis.select();
+                        }
+                    } else if (primerInputEditable) {
+                        primerInputEditable.focus();
+                        primerInputEditable.select();
                     }
                 }
             }
@@ -1656,7 +1903,7 @@
             const lblMsg = document.getElementById('lblMensajeBloqueoHorario');
             const visor = document.getElementById('pdfViewer');
             if (visor) visor.src = 'about:blank';
-            document.querySelectorAll('.sello-seg, #btnRenombrar, #btnInconsistencia, #btnLimpiar, #btnRotarIzquierda, #btnRotarDerecha').forEach(el => {
+            document.querySelectorAll('.sello-seg, #btnRenombrar, #btnAgregarSello, #btnMoverLibros, #btnPosponerPdf, #btnInconsistencia, #btnLimpiar, #btnRotarIzquierda, #btnRotarDerecha, #btnCambiarDelegacion').forEach(el => {
                 el.disabled = true;
             });
             if (lblMsg && mensaje) lblMsg.textContent = mensaje;
@@ -1791,7 +2038,6 @@
                 <i class="fa-solid fa-triangle-exclamation text-amber-500 text-2xl"></i>
                 <div>
                     <h3 class="font-bold text-lg leading-tight">Reportar Inconsistencia</h3>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">Notifica al administrador en tiempo real (solo BD)</span>
                 </div>
             </div>
             <div class="mb-3">

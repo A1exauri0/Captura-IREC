@@ -856,14 +856,6 @@ class AuditoriaSellosController extends Controller
                 ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
                 ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
 
-            $queryCapturas->where(function ($q) {
-                $q->whereNull('ac.user_id')
-                    ->orWhere(function ($sub) {
-                        $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                            ->where('u.name', 'not like', '%Administrador%');
-                    });
-            });
-
             if ($inicio && $fin) {
                 $queryCapturas->where('ac.fecha_hora', '>=', $fechaMinima)
                     ->where('ac.fecha_hora', '<=', $fechaMaxima);
@@ -990,15 +982,6 @@ class AuditoriaSellosController extends Controller
                 'ac.tipo_sello as TipoSello',
                 'ac.tiempo_captura as TiempoCaptura'
             );
-
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
 
         // Excluir Correccion renombre
         $query->where('ac.accion', '!=', 'Correccion renombre');
@@ -1398,15 +1381,6 @@ class AuditoriaSellosController extends Controller
         $query->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%inconsistencia%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
-
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
 
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
@@ -2509,15 +2483,6 @@ class AuditoriaSellosController extends Controller
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
 
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
-
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
             $fechaMinima = date('Y-m-d 00:00:00', strtotime('-1 day', strtotime($inicio)));
@@ -2964,15 +2929,6 @@ class AuditoriaSellosController extends Controller
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
 
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
-
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
             $fechaMinima = date('Y-m-d 00:00:00', strtotime('-1 day', strtotime($inicio)));
@@ -3312,15 +3268,6 @@ class AuditoriaSellosController extends Controller
         $querySellos->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
 
-        // Excluir administradores
-        $querySellos->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
-
         // Excluir turno Calidad
         $querySellos->where(function ($q) {
             $q->whereNull('ac.turno')
@@ -3358,15 +3305,6 @@ class AuditoriaSellosController extends Controller
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%inconsistencia%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libros%']);
-
-        // Excluir administradores
-        $queryCapturas->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
 
         // Excluir turno Calidad
         $queryCapturas->where(function ($q) {

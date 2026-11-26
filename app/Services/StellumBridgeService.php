@@ -65,13 +65,90 @@ class StellumBridgeService
                 ->get($this->baseUrl . '/indice-pdfs/grupo-hash', $params);
 
             if ($response->successful()) {
-                return $response->json() ?: ['ok' => false, 'items' => []];
+                $data = $response->json() ?: ['ok' => false, 'items' => []];
+                if (!empty($data['ok']) && !empty($data['items']) && count($data['items']) >= 2) {
+                    return $data;
+                }
             }
-            return ['ok' => false, 'status' => $response->status(), 'error' => 'HTTP ' . $response->status(), 'items' => []];
+
+            // Respaldo automático si el endpoint /grupo-hash aún no está desplegado en Stellum (HTTP 404):
+            // escanear bloques de 500 registros mediante /indice-pdfs y agrupar por hash exacto.
+            return $this->buscarGrupoMismoHashPorEscaneo($tipo, $excluirHashes);
         } catch (\Throwable $e) {
             Log::warning('StellumBridgeService::buscarGrupoMismoHash error: ' . $e->getMessage());
-            return ['ok' => false, 'error' => $e->getMessage(), 'items' => []];
+            return $this->buscarGrupoMismoHashPorEscaneo($tipo, $excluirHashes);
         }
+    }
+
+    /**
+     * Escanea páginas de /indice-pdfs (limit=500) para encontrar un grupo de 2+ PDFs entregables
+     * que compartan exactamente el mismo hash SHA-256 (funciona incluso sin el endpoint /grupo-hash).
+     */
+    private function buscarGrupoMismoHashPorEscaneo(string $tipo = 'sellos', array $excluirHashes = []): array
+    {
+        $excluirMap = [];
+        foreach ($excluirHashes as $h) {
+            $hTrim = strtolower(trim((string) $h));
+            if ($hTrim !== '') {
+                $excluirMap[$hTrim] = true;
+            }
+        }
+
+        $gruposPorHash = [];
+        $afterId = 0;
+        $hashEncontrado = null;
+
+        for ($pagina = 0; $pagina < 12; $pagina++) {
+            $res = $this->listarIndice([
+                'tipo'          => $tipo,
+                'clasificacion' => 'entregable',
+                'after_id'      => $afterId,
+                'limit'         => 500,
+            ]);
+
+            if (empty($res['ok']) || empty($res['items'])) {
+                break;
+            }
+
+            foreach ($res['items'] as $it) {
+                if (strtolower((string) ($it['clasificacion'] ?? '')) !== 'entregable') {
+                    continue;
+                }
+                if ($tipo !== '' && !empty($it['tipo']) && strtolower((string) $it['tipo']) !== strtolower($tipo)) {
+                    continue;
+                }
+                $h = trim((string) ($it['hash'] ?? ''));
+                if ($h === '' || isset($excluirMap[strtolower($h)])) {
+                    continue;
+                }
+                $hKey = strtolower($h);
+                $gruposPorHash[$hKey][] = $it;
+                if (count($gruposPorHash[$hKey]) >= 2 && $hashEncontrado === null) {
+                    $hashEncontrado = $hKey;
+                }
+            }
+
+            if ($hashEncontrado !== null && count($gruposPorHash[$hashEncontrado]) >= 2) {
+                $itemsGrupo = $gruposPorHash[$hashEncontrado];
+                return [
+                    'ok'    => true,
+                    'hash'  => $itemsGrupo[0]['hash'] ?? $hashEncontrado,
+                    'count' => count($itemsGrupo),
+                    'items' => $itemsGrupo,
+                ];
+            }
+
+            if (empty($res['has_more'])) {
+                break;
+            }
+            $afterId = (int) ($res['last_id'] ?? $afterId);
+        }
+
+        return [
+            'ok'    => false,
+            'error' => 'No se encontraron más grupos de PDFs entregables con el mismo hash.',
+            'items' => [],
+        ];
     }
 
     /**

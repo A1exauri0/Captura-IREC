@@ -26,15 +26,19 @@ class ArchivoSesion extends Model
         'expira_en',
         'completado_en',
         'tiempo_segundos',
+        'liberado_a_partir_de',
+        'turno_pospuesto',
+        'motivo_pospuesto',
     ];
 
     protected $casts = [
-        'tomado_en'       => 'datetime',
-        'expira_en'       => 'datetime',
-        'completado_en'   => 'datetime',
-        'archivo_danado'  => 'boolean',
-        'paginas'         => 'integer',
-        'tiempo_segundos' => 'integer',
+        'tomado_en'            => 'datetime',
+        'expira_en'            => 'datetime',
+        'completado_en'        => 'datetime',
+        'liberado_a_partir_de' => 'datetime',
+        'archivo_danado'       => 'boolean',
+        'paginas'              => 'integer',
+        'tiempo_segundos'      => 'integer',
     ];
 
     public function usuario()

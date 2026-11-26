@@ -143,8 +143,8 @@
                 @foreach($reglasDestino as $tipoKey => $reg)
                     <div class="col-md-6 mb-2">
                         <div class="p-2.5 bg-slate-50 rounded border text-xs">
-                            <div class="font-weight-bold text-sky-800 uppercase">{{ $tipoKey }} — {{ $reg['regla_captura'] }}</div>
-                            <code class="d-block mt-1 text-slate-700" style="word-break: break-all;">{{ $reg['plantilla'] }}</code>
+                            <div class="font-weight-bold text-sky-800 uppercase">{{ $tipoKey }} — {{ $reg['regla_captura'] ?? '-' }}</div>
+                            <code class="d-block mt-1 text-slate-700" style="word-break: break-all;">{{ $reg['plantilla'] ?? $reg['descripcion'] ?? 'Conserva ubicación original de entregables' }}</code>
                         </div>
                     </div>
                 @endforeach

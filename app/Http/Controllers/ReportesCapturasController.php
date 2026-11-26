@@ -131,15 +131,6 @@ class ReportesCapturasController extends Controller
         $query->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%inconsistencia%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%']);
 
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
-
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
             $fechaMinima = date('Y-m-d 00:00:00', strtotime('-1 day', strtotime($inicio)));
@@ -505,15 +496,6 @@ class ReportesCapturasController extends Controller
         // Excluir inconsistencias y movidos a inconsistencia
         $query->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%inconsistencia%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%']);
-
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
 
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
@@ -928,15 +910,6 @@ class ReportesCapturasController extends Controller
         $consulta->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%inconsistencia%'])
             ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%']);
 
-        // Excluir administradores
-        $consulta->where(function ($q) {
-            $q->whereNull('ac.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
-
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
             $fechaMinima = date('Y-m-d 00:00:00', strtotime('-1 day', strtotime($inicio)));
@@ -1307,15 +1280,6 @@ class ReportesCapturasController extends Controller
         // Excluir movidos a inconsistencia de las métricas KPI y productividad de la gráfica
         $query->whereRaw('LOWER(an.accion) NOT LIKE ?', ['%mover%']);
 
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('an.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
-
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
             $fechaMinima = date('Y-m-d 00:00:00', strtotime('-1 day', strtotime($inicio)));
@@ -1672,15 +1636,6 @@ class ReportesCapturasController extends Controller
         // Excluir inconsistencias y movidos a inconsistencia
         $query->whereRaw('LOWER(an.accion) NOT LIKE ?', ['%inconsistencia%'])
             ->whereRaw('LOWER(an.accion) NOT LIKE ?', ['%mover%']);
-
-        // Excluir administradores
-        $query->where(function ($q) {
-            $q->whereNull('an.user_id')
-                ->orWhere(function ($sub) {
-                    $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                        ->where('u.name', 'not like', '%Administrador%');
-                });
-        });
 
         // Filtrado por fecha preliminar (SQL)
         if ($inicio && $fin) {
@@ -2102,14 +2057,6 @@ class ReportesCapturasController extends Controller
             // Excluir inconsistencias
             $query->whereRaw('LOWER(an.accion) NOT LIKE ?', ['%inconsistencia%'])
                 ->whereRaw('LOWER(an.accion) NOT LIKE ?', ['%mover%']);
-            // Excluir administradores
-            $query->where(function ($q) {
-                $q->whereNull('an.user_id')
-                    ->orWhere(function ($sub) {
-                        $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                            ->where('u.name', 'not like', '%Administrador%');
-                    });
-            });
             if ($inicio && $fin) {
                 $fechaMinima = date('Y-m-d 00:00:00', strtotime('-1 day', strtotime($inicio)));
                 $fechaMaxima = date('Y-m-d 23:59:59', strtotime('+1 day', strtotime($fin)));
@@ -2133,15 +2080,6 @@ class ReportesCapturasController extends Controller
             $query->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%inconsistencia%'])
                 ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%mover%'])
                 ->whereRaw('LOWER(ac.accion) NOT LIKE ?', ['%libro%']);
-
-            // Excluir administradores
-            $query->where(function ($q) {
-                $q->whereNull('ac.user_id')
-                    ->orWhere(function ($sub) {
-                        $sub->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
-                            ->where('u.name', 'not like', '%Administrador%');
-                    });
-            });
 
             // Filtrar por tipo de sello si se especificó
             if ($tipoSello) {

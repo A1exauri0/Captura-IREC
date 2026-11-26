@@ -7,8 +7,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Anio;
-use App\Models\Delegaciones;
+use App\Models\ArchivoMuestreo;
 use App\Models\ArchivoSesion;
+use App\Models\ControlMuestreo;
+use App\Models\Delegaciones;
+use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Municipios;
 use App\Models\Localidades;
@@ -208,6 +211,18 @@ class CapturaController extends Controller
                 ->get(['codigo', 'motivo_rechazo', 'accion_correctiva']);
         }
 
+        // Determinar modo de operación según el rol del usuario:
+        // - Captura -> siempre 'captura'
+        // - Calidad -> siempre 'muestreo'
+        // - Admin / Superadmin -> 'muestreo' si viene ?modo=muestreo, si no 'captura'
+        $esRolCalidad = $usuario && $usuario->hasRole('Calidad') && !$usuario->hasRole('Captura');
+        $esAdmin = $usuario && $usuario->hasAnyRole(['superadmin', 'administrador']);
+        $modoOperacion = ($esRolCalidad || ($esAdmin && $request->query('modo') === 'muestreo'))
+            ? 'muestreo'
+            : 'captura';
+
+        $reglasDigitosSellos = config('reglas_digitos_sellos', []);
+
         return view('operacion.estacion_captura', compact(
             'anios',
             'delegaciones',
@@ -218,7 +233,9 @@ class CapturaController extends Controller
             'estadoHorario',
             'pcSeleccionada',
             'servidorTimestampMs',
-            'servidorZonaHoraria'
+            'servidorZonaHoraria',
+            'modoOperacion',
+            'reglasDigitosSellos'
         ));
     }
 
@@ -288,11 +305,9 @@ class CapturaController extends Controller
         $userId = $usuario?->id;
         $tipoDoc = 'sellos';
 
-        // 0. Liberar sesiones expiradas (> 15 min inactivas)
-        ArchivoSesion::where('estado', 'en_captura')
-            ->whereNotNull('expira_en')
-            ->where('expira_en', '<', now())
-            ->delete();
+        $esRolCalidad = $usuario && $usuario->hasRole('Calidad') && !$usuario->hasRole('Captura');
+        $esAdmin = $usuario && $usuario->hasAnyRole(['superadmin', 'administrador']);
+        $esModoMuestreo = $esRolCalidad || ($esAdmin && $request->query('modo') === 'muestreo');
 
         // Helper para extraer etiqueta corta de botón (ej. número de registro/inscripción "0063" o "0001")
         $extraerEtiqueta = function (string $nombreSinExt, int $orden): string {
@@ -302,7 +317,129 @@ class CapturaController extends Controller
             return str_pad((string) $orden, 4, '0', STR_PAD_LEFT);
         };
 
-        // 1. Reanudar: si el usuario ya tiene archivos en_captura (individual o grupo por mismo hash), devolver todos
+        // =========================================================================
+        // FLUJO EN MODO MUESTREO (ROL CALIDAD)
+        // Solo entrega archivos de muestreos previamente generados (control_muestreos.estado = 'en_proceso')
+        // =========================================================================
+        if ($esModoMuestreo) {
+            $evalHorarioMuestreo = $this->evaluarHorarioUsuario($usuario, false, null);
+            if (!$evalHorarioMuestreo['permitido']) {
+                return response()->json([
+                    'ok'            => false,
+                    'fuera_horario' => true,
+                    'mensaje'       => $evalHorarioMuestreo['mensaje'],
+                ], 403);
+            }
+
+            // Reanudar archivo de muestreo que este usuario ya tenga en_captura, o tomar el siguiente pendiente
+            $itemMuestreo = ArchivoMuestreo::with('controlMuestreo')
+                ->whereHas('controlMuestreo', fn ($q) => $q->where('estado', 'en_proceso'))
+                ->where('calidad_user_id', $userId)
+                ->where('estado', 'en_captura')
+                ->orderBy('id')
+                ->first();
+
+            if (!$itemMuestreo) {
+                $itemMuestreo = ArchivoMuestreo::with('controlMuestreo')
+                    ->whereHas('controlMuestreo', fn ($q) => $q->where('estado', 'en_proceso'))
+                    ->where('estado', 'pendiente')
+                    ->where(function ($q) use ($userId) {
+                        $q->where('calidad_user_id', $userId)
+                          ->orWhereNull('calidad_user_id');
+                    })
+                    ->orderByRaw('CASE WHEN calidad_user_id = ? THEN 0 ELSE 1 END', [$userId ?? 0])
+                    ->orderBy('id')
+                    ->first();
+
+                if ($itemMuestreo) {
+                    $itemMuestreo->update([
+                        'estado'          => 'en_captura',
+                        'calidad_user_id' => $userId,
+                        'tomado_en'       => now(),
+                    ]);
+                }
+            }
+
+            if (!$itemMuestreo) {
+                return response()->json([
+                    'ok'      => false,
+                    'modo'    => 'muestreo',
+                    'mensaje' => 'No hay muestreos generados pendientes por trabajar. Primero debe generarse el muestreo con el botón "Generar Muestreo".',
+                ]);
+            }
+
+            $delMuestreo = $itemMuestreo->delegacion_id ? Delegaciones::find($itemMuestreo->delegacion_id) : null;
+            if (!$delMuestreo && preg_match('/^(\d{2})[_-]/', (string) $itemMuestreo->archivo_capturado, $mDel)) {
+                $delMuestreo = Delegaciones::where('clave', $mDel[1])->first();
+            }
+
+            $ctrl = $itemMuestreo->controlMuestreo;
+            return response()->json([
+                'ok'         => true,
+                'modo'       => 'muestreo',
+                'fuente'     => $itemMuestreo->indice_pdf_id ? 'stellum' : 'directorio_directo',
+                'lote_id'    => $itemMuestreo->id,
+                'lote'       => "Muestreo #{$ctrl->id} ({$ctrl->fecha_laboral} · {$ctrl->turno})",
+                'delegacion' => $delMuestreo ? [
+                    'id'     => $delMuestreo->id,
+                    'clave'  => str_pad($delMuestreo->clave ?? $delMuestreo->id, 2, '0', STR_PAD_LEFT),
+                    'nombre' => $delMuestreo->nombre,
+                ] : null,
+                'muestreo_info' => [
+                    'control_id'         => $ctrl->id,
+                    'fecha_laboral'      => $ctrl->fecha_laboral,
+                    'turno'              => $ctrl->turno,
+                    'regla'              => $ctrl->regla,
+                    'revisados'          => $ctrl->revisados,
+                    'muestra'            => $ctrl->muestra,
+                    'errores_detectados' => $ctrl->errores_detectados,
+                    'errores_permitidos' => $ctrl->errores_permitidos,
+                ],
+                'archivos' => [[
+                    'sesion_id'        => $itemMuestreo->id,
+                    'muestreo_item_id' => $itemMuestreo->id,
+                    'indice_pdf_id'    => $itemMuestreo->indice_pdf_id,
+                    'ruta'             => $itemMuestreo->indice_pdf_id ? ('stellum:' . $itemMuestreo->indice_pdf_id) : $itemMuestreo->ruta_origen,
+                    'ruta_origen'      => $itemMuestreo->ruta_origen,
+                    'nombre'           => $itemMuestreo->archivo_capturado,
+                    'etiqueta_boton'   => $extraerEtiqueta((string) $itemMuestreo->archivo_capturado, 1),
+                    'paginas'          => (int) ($itemMuestreo->paginas ?: 1),
+                    'hash'             => $itemMuestreo->hash,
+                    'tipo'             => 'sellos',
+                ]],
+                'mismo_hash' => false,
+                'total'      => 1,
+            ]);
+        }
+
+        // 0. Liberar sesiones expiradas (> 15 min inactivas)
+        ArchivoSesion::where('estado', 'en_captura')
+            ->whereNotNull('expira_en')
+            ->where('expira_en', '<', now())
+            ->delete();
+
+        // 0.5. Si el usuario tiene PDFs pospuestos ("skipeados") cuyo horario de liberación (siguiente turno) ya llegó,
+        // reactivarlos exclusivamente para este mismo usuario
+        if ($userId) {
+            $pospuestoListo = ArchivoSesion::where('user_id', $userId)
+                ->where('estado', 'pospuesto')
+                ->whereNotNull('liberado_a_partir_de')
+                ->where('liberado_a_partir_de', '<=', now())
+                ->orderBy('liberado_a_partir_de')
+                ->first();
+
+            if ($pospuestoListo) {
+                $pospuestoListo->update([
+                    'estado'               => 'en_captura',
+                    'tomado_en'            => now(),
+                    'expira_en'            => now()->addMinutes(15),
+                    'liberado_a_partir_de' => null,
+                ]);
+            }
+        }
+
+        // 1. Reanudar o gestionar las 2 sesiones activas por usuario (1 PDF en trabajo + 1 PDF precargado en segundo plano)
+        $esPrefetch = $request->boolean('prefetch');
         $sesionesActivas = ArchivoSesion::where('user_id', $userId)
             ->where('estado', 'en_captura')
             ->orderBy('id')
@@ -319,14 +456,25 @@ class CapturaController extends Controller
             ], 403);
         }
 
-        if ($sesionesActivas->isNotEmpty()) {
-            ArchivoSesion::whereIn('id', $sesionesActivas->pluck('id'))
-                ->update(['expira_en' => now()->addMinutes(15)]);
-            $delActiva = $sesionActiva->delegacion_id ? Delegaciones::find($sesionActiva->delegacion_id) : null;
+        // Agrupar sesiones activas por documento/hash para distinguir el PDF #1 (actual) del PDF #2 (precargado en sesión)
+        $gruposActivos = [];
+        foreach ($sesionesActivas as $ses) {
+            $keyGrupo = trim((string) $ses->hash_pdf) !== ''
+                ? ('hash_' . strtolower(trim((string) $ses->hash_pdf)))
+                : ('sesion_' . $ses->id);
+            $gruposActivos[$keyGrupo][] = $ses;
+        }
+        $listaGruposActivos = array_values($gruposActivos);
 
-            $archivosActivos = [];
-            foreach ($sesionesActivas->values() as $idx => $ses) {
-                $archivosActivos[] = [
+        $formatearGrupoSesion = function (array $grupoSesiones) use ($extraerEtiqueta): array {
+            $primera = $grupoSesiones[0];
+            $delGrupo = $primera->delegacion_id ? Delegaciones::find($primera->delegacion_id) : null;
+            if (!$delGrupo && preg_match('/^(\d{2})[_-]/', (string) $primera->archivo_nombre, $mDel)) {
+                $delGrupo = Delegaciones::where('clave', $mDel[1])->first();
+            }
+            $archivosGrupo = [];
+            foreach (array_values($grupoSesiones) as $idx => $ses) {
+                $archivosGrupo[] = [
                     'sesion_id'      => $ses->id,
                     'indice_pdf_id'  => $ses->indice_pdf_id,
                     'ruta'           => $ses->indice_pdf_id ? ('stellum:' . $ses->indice_pdf_id) : $ses->ruta_origen,
@@ -338,203 +486,278 @@ class CapturaController extends Controller
                     'tipo'           => $ses->tipo_archivo,
                 ];
             }
-
-            return response()->json([
-                'ok'            => true,
-                'fuente'        => $sesionActiva->indice_pdf_id ? 'stellum' : 'directorio_directo',
-                'lote_id'       => $sesionActiva->id,
-                'lote'          => $sesionActiva->archivo_nombre,
-                'delegacion'    => $delActiva ? [
-                    'id'     => $delActiva->id,
-                    'clave'  => str_pad($delActiva->clave ?? $delActiva->id, 2, '0', STR_PAD_LEFT),
-                    'nombre' => $delActiva->nombre,
+            return [
+                'ok'         => true,
+                'fuente'     => $primera->indice_pdf_id ? 'stellum' : 'directorio_directo',
+                'lote_id'    => $primera->id,
+                'lote'       => $primera->archivo_nombre,
+                'delegacion' => $delGrupo ? [
+                    'id'     => $delGrupo->id,
+                    'clave'  => str_pad($delGrupo->clave ?? $delGrupo->id, 2, '0', STR_PAD_LEFT),
+                    'nombre' => $delGrupo->nombre,
                 ] : null,
-                'archivos'      => $archivosActivos,
-                'mismo_hash'    => count($archivosActivos) > 1,
-                'total'         => count($archivosActivos),
-            ]);
+                'archivos'   => $archivosGrupo,
+                'mismo_hash' => count($archivosGrupo) > 1,
+                'total'      => count($archivosGrupo),
+            ];
+        };
+
+        if ($sesionesActivas->isNotEmpty()) {
+            ArchivoSesion::whereIn('id', $sesionesActivas->pluck('id'))
+                ->update(['expira_en' => now()->addMinutes(15)]);
+
+            // Si es petición de precarga en segundo plano (prefetch=1):
+            // - Si ya tiene un 2.º PDF en sesión, devolver ese 2.º PDF sin abrir un 3.º.
+            // - Si solo tiene 1 PDF en sesión, continuar abajo para asignarle el 2.º PDF en archivos_sesiones.
+            if ($esPrefetch) {
+                if (count($listaGruposActivos) >= 2) {
+                    $payloadPrefetch = $formatearGrupoSesion($listaGruposActivos[1]);
+                    $payloadPrefetch['prefetch'] = true;
+                    return response()->json($payloadPrefetch);
+                }
+            } else {
+                // Petición principal: devolver el PDF #1 como activo y, si ya existe el PDF #2 en sesión, adjuntarlo en prefetch_data
+                $payloadPrincipal = $formatearGrupoSesion($listaGruposActivos[0]);
+                if (count($listaGruposActivos) >= 2) {
+                    $payloadPrincipal['prefetch_data'] = $formatearGrupoSesion($listaGruposActivos[1]);
+                }
+                return response()->json($payloadPrincipal);
+            }
         }
 
         $delFiltro = $delegacionId ? Delegaciones::find($delegacionId) : null;
 
         // 2. Consultar EXCLUSIVAMENTE indice_archivos_pdfs en Stellum (paginación por cursor after_id)
+        // Prioridad operativa: cuando no hay delegación fija, buscar primero PDFs de Tuxtla (clave 01_)
+        // y solo si ya no hay disponibles en Tuxtla continuar con el resto de delegaciones.
         try {
             $bridge = app(StellumBridgeService::class);
-            $afterId = (int) $request->session()->pull('admin_skip_after_id', 0);
+            $skipAfterIdInicial = (int) $request->session()->pull('admin_skip_after_id', 0);
             $maxPaginas = 20; // hasta 2,000 registros por ciclo sin OFFSET
 
-            for ($paginaCursor = 0; $paginaCursor < $maxPaginas; $paginaCursor++) {
-                $respStellum = $bridge->listarIndice([
-                    'tipo'          => $tipoDoc,
-                    'clasificacion' => 'entregable',
-                    'delegacion'    => $delFiltro?->nombre,
-                    'after_id'      => $afterId,
-                    'limit'         => 100,
-                ]);
+            $fasesBusqueda = $delFiltro
+                ? [['delegacion' => $delFiltro->nombre, 'q' => null]]
+                : [
+                    ['delegacion' => null, 'q' => '01_'], // Fase 1: Prioridad Tuxtla (01_)
+                    ['delegacion' => null, 'q' => null],  // Fase 2: Resto de delegaciones
+                ];
 
-                if (empty($respStellum['ok'])) {
-                    return response()->json([
-                        'ok'      => false,
-                        'mensaje' => 'No se pudo consultar indice_archivos_pdfs en Stellum: ' . ($respStellum['error'] ?? ('HTTP ' . ($respStellum['status'] ?? 'error'))),
-                    ]);
-                }
+            foreach ($fasesBusqueda as $idxFase => $fase) {
+                $afterId = ($idxFase === 0) ? $skipAfterIdInicial : 0;
 
-                $items = $respStellum['items'] ?? [];
-                if (empty($items)) {
-                    break;
-                }
-
-                foreach ($items as $item) {
-                    $indiceId = isset($item['id']) ? (int) $item['id'] : null;
-                    if (!$indiceId) {
-                        continue;
+                for ($paginaCursor = 0; $paginaCursor < $maxPaginas; $paginaCursor++) {
+                    $paramsStellum = [
+                        'tipo'          => $tipoDoc,
+                        'clasificacion' => 'entregable',
+                        'after_id'      => $afterId,
+                        'limit'         => 100,
+                    ];
+                    if (!empty($fase['delegacion'])) {
+                        $paramsStellum['delegacion'] = $fase['delegacion'];
+                    }
+                    if (!empty($fase['q'])) {
+                        $paramsStellum['q'] = $fase['q'];
                     }
 
-                    $rutaOrigen = (string) ($item['ruta'] ?? ('stellum:' . $indiceId));
-                    $rutaHash = hash('sha256', $rutaOrigen);
+                    $respStellum = $bridge->listarIndice($paramsStellum);
 
-                    $yaTomado = ArchivoSesion::where(function ($q) use ($rutaHash, $indiceId) {
-                            $q->where('ruta_hash', $rutaHash)
-                              ->orWhere('indice_pdf_id', $indiceId);
-                        })
-                        ->whereIn('estado', ['en_captura', 'completado'])
-                        ->exists();
-
-                    if ($yaTomado) {
-                        continue;
-                    }
-
-                    $nombreSinExt = preg_replace('/\.pdf$/i', '', (string) ($item['nombre'] ?? 'archivo'));
-
-                    // Resolver delegación desde el registro de indice_archivos_pdfs si no venía filtrada
-                    $delItem = $delFiltro;
-                    if (!$delItem && !empty($item['delegacion'])) {
-                        $delItem = Delegaciones::whereRaw('LOWER(nombre) = ?', [strtolower(trim((string) $item['delegacion']))])->first();
-                    }
-
-                    try {
-                        $nuevaSesion = ArchivoSesion::create([
-                            'user_id'        => $userId,
-                            'indice_pdf_id'  => $indiceId,
-                            'disco'          => 'indice_archivos_pdfs',
-                            'tipo_archivo'   => $tipoDoc,
-                            'delegacion_id'  => $delItem?->id,
-                            'pc'             => $this->obtenerPcActual($request, $usuario),
-                            'archivo_nombre' => $nombreSinExt,
-                            'ruta_origen'    => $rutaOrigen,
-                            'ruta_hash'      => $rutaHash,
-                            'paginas'        => (int) ($item['paginas'] ?? 1),
-                            'hash_pdf'       => $item['hash'] ?? null,
-                            'estado'         => 'en_captura',
-                            'tomado_en'      => now(),
-                            'expira_en'      => now()->addMinutes(15),
+                    if (empty($respStellum['ok'])) {
+                        return response()->json([
+                            'ok'      => false,
+                            'mensaje' => 'No se pudo consultar indice_archivos_pdfs en Stellum: ' . ($respStellum['error'] ?? ('HTTP ' . ($respStellum['status'] ?? 'error'))),
                         ]);
+                    }
 
-                        $archivosAsignados = [[
-                            'sesion_id'      => $nuevaSesion->id,
-                            'indice_pdf_id'  => $indiceId,
-                            'ruta'           => 'stellum:' . $indiceId,
-                            'ruta_origen'    => $rutaOrigen,
-                            'nombre'         => $nombreSinExt,
-                            'etiqueta_boton' => $extraerEtiqueta($nombreSinExt, 1),
-                            'paginas'        => (int) ($item['paginas'] ?? 1),
-                            'hash'           => $item['hash'] ?? null,
-                            'tipo'           => $item['tipo'] ?? $tipoDoc,
-                            'clasificacion'  => $item['clasificacion'] ?? null,
-                        ]];
+                    $items = $respStellum['items'] ?? [];
+                    if (empty($items)) {
+                        break;
+                    }
 
-                        // Consultar en Stellum si existen otros PDFs entregables con el MISMO hash (para capturarlos juntos viendo un solo PDF)
-                        $hashPdf = trim((string) ($item['hash'] ?? ''));
-                        if ($hashPdf !== '') {
-                            $respHash = $bridge->listarIndice([
-                                'tipo'          => $tipoDoc,
-                                'clasificacion' => 'entregable',
-                                'hash'          => $hashPdf,
-                                'limit'         => 25,
+                    foreach ($items as $item) {
+                        $indiceId = isset($item['id']) ? (int) $item['id'] : null;
+                        if (!$indiceId) {
+                            continue;
+                        }
+
+                        $rutaOrigen = (string) ($item['ruta'] ?? ('stellum:' . $indiceId));
+                        $rutaHash = hash('sha256', $rutaOrigen);
+                        $hashItem = trim((string) ($item['hash'] ?? ''));
+
+                        $yaTomado = ArchivoSesion::where(function ($q) use ($rutaHash, $indiceId, $hashItem) {
+                                $q->where('ruta_hash', $rutaHash)
+                                  ->orWhere('indice_pdf_id', $indiceId);
+                                // Si otro usuario ya tiene en_captura o pospuesto cualquier PDF con este mismo hash, bloquear todo el grupo
+                                if ($hashItem !== '') {
+                                    $q->orWhere(function ($qH) use ($hashItem) {
+                                        $qH->where('hash_pdf', $hashItem)
+                                           ->whereIn('estado', ['en_captura', 'pospuesto']);
+                                    });
+                                }
+                            })
+                            ->whereIn('estado', ['en_captura', 'completado', 'pospuesto'])
+                            ->exists();
+
+                        if ($yaTomado) {
+                            continue;
+                        }
+
+                        $nombreSinExt = preg_replace('/\.pdf$/i', '', (string) ($item['nombre'] ?? 'archivo'));
+
+                        // Resolver delegación desde el prefijo del archivo (ej. 01_...) o el campo delegacion de Stellum
+                        $delItem = $delFiltro;
+                        if (!$delItem && preg_match('/^(\d{2})[_-]/', $nombreSinExt, $mClave)) {
+                            $delItem = Delegaciones::where('clave', $mClave[1])->first();
+                        }
+                        if (!$delItem && !empty($item['delegacion'])) {
+                            $delItem = Delegaciones::whereRaw('LOWER(nombre) = ?', [strtolower(trim((string) $item['delegacion']))])->first();
+                        }
+
+                        try {
+                            $nuevaSesion = ArchivoSesion::create([
+                                'user_id'        => $userId,
+                                'indice_pdf_id'  => $indiceId,
+                                'disco'          => 'indice_archivos_pdfs',
+                                'tipo_archivo'   => $tipoDoc,
+                                'delegacion_id'  => $delItem?->id,
+                                'pc'             => $this->obtenerPcActual($request, $usuario),
+                                'archivo_nombre' => $nombreSinExt,
+                                'ruta_origen'    => $rutaOrigen,
+                                'ruta_hash'      => $rutaHash,
+                                'paginas'        => (int) ($item['paginas'] ?? 1),
+                                'hash_pdf'       => $item['hash'] ?? null,
+                                'estado'         => 'en_captura',
+                                'tomado_en'      => now(),
+                                'expira_en'      => now()->addMinutes(15),
                             ]);
-                            if (!empty($respHash['ok']) && !empty($respHash['items'])) {
-                                foreach ($respHash['items'] as $itDup) {
-                                    $dupId = isset($itDup['id']) ? (int) $itDup['id'] : null;
-                                    if (!$dupId || $dupId === $indiceId) {
+
+                            $archivosAsignados = [[
+                                'sesion_id'      => $nuevaSesion->id,
+                                'indice_pdf_id'  => $indiceId,
+                                'ruta'           => 'stellum:' . $indiceId,
+                                'ruta_origen'    => $rutaOrigen,
+                                'nombre'         => $nombreSinExt,
+                                'etiqueta_boton' => $extraerEtiqueta($nombreSinExt, 1),
+                                'paginas'        => (int) ($item['paginas'] ?? 1),
+                                'hash'           => $item['hash'] ?? null,
+                                'tipo'           => $item['tipo'] ?? $tipoDoc,
+                                'clasificacion'  => $item['clasificacion'] ?? null,
+                            ]];
+
+                            // Consultar si existen otros PDFs entregables con el MISMO hash (tanto en el lote actual como en Stellum)
+                            $hashPdf = trim((string) ($item['hash'] ?? ''));
+                            if ($hashPdf !== '') {
+                                $candidatosMismoHash = [];
+                                // 1) Revisar primero dentro del bloque actual ya descargado ($items)
+                                foreach ($items as $itLocal) {
+                                    if (strtolower((string) ($itLocal['clasificacion'] ?? 'entregable')) !== 'entregable') {
                                         continue;
                                     }
-                                    // Validación estricta: solo agrupar si el hash coincide EXACTAMENTE con el PDF actual
-                                    $dupHash = trim((string) ($itDup['hash'] ?? ''));
-                                    if ($dupHash === '' || strcasecmp($dupHash, $hashPdf) !== 0) {
-                                        continue;
+                                    $hLocal = trim((string) ($itLocal['hash'] ?? ''));
+                                    if ($hLocal !== '' && strcasecmp($hLocal, $hashPdf) === 0) {
+                                        $candidatosMismoHash[$itLocal['id'] ?? uniqid()] = $itLocal;
                                     }
-                                    $dupRuta = (string) ($itDup['ruta'] ?? ('stellum:' . $dupId));
-                                    $dupRutaHash = hash('sha256', $dupRuta);
-                                    $dupYaTomado = ArchivoSesion::where(function ($q) use ($dupRutaHash, $dupId) {
-                                            $q->where('ruta_hash', $dupRutaHash)
-                                              ->orWhere('indice_pdf_id', $dupId);
-                                        })
-                                        ->whereIn('estado', ['en_captura', 'completado'])
-                                        ->exists();
-                                    if ($dupYaTomado) {
-                                        continue;
+                                }
+                                // 2) Consultar también por parámetro hash en Stellum (hasta 100 coincidencias exactas para bloquear todo el grupo)
+                                $respHash = $bridge->listarIndice([
+                                    'tipo'          => $tipoDoc,
+                                    'clasificacion' => 'entregable',
+                                    'hash'          => $hashPdf,
+                                    'limit'         => 100,
+                                ]);
+                                if (!empty($respHash['ok']) && !empty($respHash['items'])) {
+                                    foreach ($respHash['items'] as $itRemoto) {
+                                        $hRem = trim((string) ($itRemoto['hash'] ?? ''));
+                                        if ($hRem !== '' && strcasecmp($hRem, $hashPdf) === 0) {
+                                            $candidatosMismoHash[$itRemoto['id'] ?? uniqid()] = $itRemoto;
+                                        }
                                     }
-                                    $dupNombre = preg_replace('/\.pdf$/i', '', (string) ($itDup['nombre'] ?? 'archivo'));
-                                    try {
-                                        $sesDup = ArchivoSesion::create([
-                                            'user_id'        => $userId,
-                                            'indice_pdf_id'  => $dupId,
-                                            'disco'          => 'indice_archivos_pdfs',
-                                            'tipo_archivo'   => $tipoDoc,
-                                            'delegacion_id'  => $delItem?->id,
-                                            'pc'             => $this->obtenerPcActual($request, $usuario),
-                                            'archivo_nombre' => $dupNombre,
-                                            'ruta_origen'    => $dupRuta,
-                                            'ruta_hash'      => $dupRutaHash,
-                                            'paginas'        => (int) ($itDup['paginas'] ?? 1),
-                                            'hash_pdf'       => $itDup['hash'] ?? $hashPdf,
-                                            'estado'         => 'en_captura',
-                                            'tomado_en'      => now(),
-                                            'expira_en'      => now()->addMinutes(15),
-                                        ]);
-                                        $archivosAsignados[] = [
-                                            'sesion_id'      => $sesDup->id,
-                                            'indice_pdf_id'  => $dupId,
-                                            'ruta'           => 'stellum:' . $dupId,
-                                            'ruta_origen'    => $dupRuta,
-                                            'nombre'         => $dupNombre,
-                                            'etiqueta_boton' => $extraerEtiqueta($dupNombre, count($archivosAsignados) + 1),
-                                            'paginas'        => (int) ($itDup['paginas'] ?? 1),
-                                            'hash'           => $itDup['hash'] ?? $hashPdf,
-                                            'tipo'           => $itDup['tipo'] ?? $tipoDoc,
-                                            'clasificacion'  => $itDup['clasificacion'] ?? null,
-                                        ];
-                                    } catch (\Throwable $eDup) {
-                                        continue;
+                                }
+
+                                if (!empty($candidatosMismoHash)) {
+                                    foreach ($candidatosMismoHash as $itDup) {
+                                        $dupId = isset($itDup['id']) ? (int) $itDup['id'] : null;
+                                        if (!$dupId || $dupId === $indiceId) {
+                                            continue;
+                                        }
+                                        // Validación estricta: solo agrupar si el hash coincide EXACTAMENTE con el PDF actual
+                                        $dupHash = trim((string) ($itDup['hash'] ?? ''));
+                                        if ($dupHash === '' || strcasecmp($dupHash, $hashPdf) !== 0) {
+                                            continue;
+                                        }
+                                        $dupRuta = (string) ($itDup['ruta'] ?? ('stellum:' . $dupId));
+                                        $dupRutaHash = hash('sha256', $dupRuta);
+                                        $dupYaTomado = ArchivoSesion::where(function ($q) use ($dupRutaHash, $dupId) {
+                                                $q->where('ruta_hash', $dupRutaHash)
+                                                  ->orWhere('indice_pdf_id', $dupId);
+                                            })
+                                            ->whereIn('estado', ['en_captura', 'completado', 'pospuesto'])
+                                            ->exists();
+                                        if ($dupYaTomado) {
+                                            continue;
+                                        }
+                                        $dupNombre = preg_replace('/\.pdf$/i', '', (string) ($itDup['nombre'] ?? 'archivo'));
+                                        try {
+                                            $sesDup = ArchivoSesion::create([
+                                                'user_id'        => $userId,
+                                                'indice_pdf_id'  => $dupId,
+                                                'disco'          => 'indice_archivos_pdfs',
+                                                'tipo_archivo'   => $tipoDoc,
+                                                'delegacion_id'  => $delItem?->id,
+                                                'pc'             => $this->obtenerPcActual($request, $usuario),
+                                                'archivo_nombre' => $dupNombre,
+                                                'ruta_origen'    => $dupRuta,
+                                                'ruta_hash'      => $dupRutaHash,
+                                                'paginas'        => (int) ($itDup['paginas'] ?? 1),
+                                                'hash_pdf'       => $itDup['hash'] ?? $hashPdf,
+                                                'estado'         => 'en_captura',
+                                                'tomado_en'      => now(),
+                                                'expira_en'      => now()->addMinutes(15),
+                                            ]);
+                                            $archivosAsignados[] = [
+                                                'sesion_id'      => $sesDup->id,
+                                                'indice_pdf_id'  => $dupId,
+                                                'ruta'           => 'stellum:' . $dupId,
+                                                'ruta_origen'    => $dupRuta,
+                                                'nombre'         => $dupNombre,
+                                                'etiqueta_boton' => $extraerEtiqueta($dupNombre, count($archivosAsignados) + 1),
+                                                'paginas'        => (int) ($itDup['paginas'] ?? 1),
+                                                'hash'           => $itDup['hash'] ?? $hashPdf,
+                                                'tipo'           => $itDup['tipo'] ?? $tipoDoc,
+                                                'clasificacion'  => $itDup['clasificacion'] ?? null,
+                                            ];
+                                        } catch (\Throwable $eDup) {
+                                            continue;
+                                        }
                                     }
                                 }
                             }
+
+                            return response()->json([
+                                'ok'         => true,
+                                'prefetch'   => $esPrefetch,
+                                'fuente'     => 'stellum',
+                                'lote_id'    => $nuevaSesion->id,
+                                'lote'       => $nombreSinExt,
+                                'delegacion' => $delItem ? [
+                                    'id'     => $delItem->id,
+                                    'clave'  => str_pad($delItem->clave ?? $delItem->id, 2, '0', STR_PAD_LEFT),
+                                    'nombre' => $delItem->nombre,
+                                ] : null,
+                                'archivos'   => $archivosAsignados,
+                                'mismo_hash' => count($archivosAsignados) > 1,
+                                'total'      => count($archivosAsignados),
+                            ]);
+                        } catch (\Throwable $e) {
+                            // Otro capturista tomó este archivo en el mismo milisegundo; continuar con el siguiente
+                            continue;
                         }
-
-                        return response()->json([
-                            'ok'         => true,
-                            'fuente'     => 'stellum',
-                            'lote_id'    => $nuevaSesion->id,
-                            'lote'       => $nombreSinExt,
-                            'delegacion' => $delItem ? [
-                                'id'     => $delItem->id,
-                                'clave'  => str_pad($delItem->clave ?? $delItem->id, 2, '0', STR_PAD_LEFT),
-                                'nombre' => $delItem->nombre,
-                            ] : null,
-                            'archivos'   => $archivosAsignados,
-                            'mismo_hash' => count($archivosAsignados) > 1,
-                            'total'      => count($archivosAsignados),
-                        ]);
-                    } catch (\Throwable $e) {
-                        // Otro capturista tomó este archivo en el mismo milisegundo; continuar con el siguiente
-                        continue;
                     }
-                }
 
-                if (empty($respStellum['has_more'])) {
-                    break;
+                    if (empty($respStellum['has_more'])) {
+                        break;
+                    }
+                    $afterId = (int) ($respStellum['last_id'] ?? $afterId);
                 }
-                $afterId = (int) ($respStellum['last_id'] ?? $afterId);
             }
         } catch (\Throwable $e) {
             return response()->json([
@@ -554,16 +777,22 @@ class CapturaController extends Controller
         $usuario = Auth::user();
         abort_unless($usuario && $usuario->hasAnyRole(['superadmin', 'administrador']), 403, 'Solo administradores.');
 
-        $maxIdActual = (int) ArchivoSesion::where('user_id', $usuario->id)
+        $sesiones = ArchivoSesion::where('user_id', $usuario->id)
             ->where('estado', 'en_captura')
-            ->max('indice_pdf_id');
+            ->orderBy('id')
+            ->get();
 
-        ArchivoSesion::where('user_id', $usuario->id)
-            ->where('estado', 'en_captura')
-            ->delete();
-
-        if ($maxIdActual > 0) {
-            $request->session()->put('admin_skip_after_id', $maxIdActual);
+        if ($sesiones->isNotEmpty()) {
+            $primera = $sesiones->first();
+            $hashPrimera = trim((string) $primera->hash_pdf);
+            $idsEliminar = $sesiones
+                ->filter(fn ($s) => $hashPrimera !== '' ? strcasecmp(trim((string) $s->hash_pdf), $hashPrimera) === 0 : $s->id === $primera->id)
+                ->pluck('id');
+            $maxIdGrupo = (int) $sesiones->whereIn('id', $idsEliminar)->max('indice_pdf_id');
+            ArchivoSesion::whereIn('id', $idsEliminar)->delete();
+            if ($maxIdGrupo > 0) {
+                $request->session()->put('admin_skip_after_id', $maxIdGrupo);
+            }
         }
 
         return $this->buscarPdf($request);
@@ -627,6 +856,9 @@ class CapturaController extends Controller
             $rutaHash = hash('sha256', $rutaOrg);
             $nombreSinExt = preg_replace('/\.pdf$/i', '', (string) ($it['nombre'] ?? 'archivo'));
 
+            if (!$delItem && preg_match('/^(\d{2})[_-]/', $nombreSinExt, $mClave)) {
+                $delItem = Delegaciones::where('clave', $mClave[1])->first();
+            }
             if (!$delItem && !empty($it['delegacion'])) {
                 $delItem = Delegaciones::whereRaw('LOWER(nombre) = ?', [strtolower(trim((string) $it['delegacion']))])->first();
             }
@@ -791,6 +1023,98 @@ class CapturaController extends Controller
     private function registrarAccionSoloBd(Request $request, string $modo): \Illuminate\Http\JsonResponse
     {
         $usuario = Auth::user();
+
+        // =========================================================================
+        // GUARDADO EN MODO MUESTREO (ROL CALIDAD) — 100% EN BD
+        // Si coincide el nombre anterior (archivo_capturado) y el nuevo -> 'validado' (correcto)
+        // Si no coinciden -> 'renombrado' (error de muestreo + marca revisar=1 en auditoria_sellos)
+        // =========================================================================
+        $esRolCalidad = $usuario && $usuario->hasRole('Calidad') && !$usuario->hasRole('Captura');
+        $muestreoItemId = $request->input('muestreo_item_id') ? (int) $request->input('muestreo_item_id') : null;
+        if ($esRolCalidad || $muestreoItemId || $request->input('modo_operacion') === 'muestreo') {
+            $itemMuestreo = $muestreoItemId
+                ? ArchivoMuestreo::with('controlMuestreo')->find($muestreoItemId)
+                : ArchivoMuestreo::with('controlMuestreo')
+                    ->where('calidad_user_id', $usuario?->id)
+                    ->where('estado', 'en_captura')
+                    ->latest('id')
+                    ->first();
+
+            if ($itemMuestreo) {
+                $capturadoAnterior = preg_replace('/\.pdf$/i', '', trim((string) $itemMuestreo->archivo_capturado));
+                $nuevoReq = trim((string) ($request->input('nuevo_nombre') ?: $request->input('archivo_nuevo') ?: $capturadoAnterior));
+                $nuevoMuestreo = preg_replace('/\.pdf$/i', '', $nuevoReq);
+
+                $coincide = strcasecmp($capturadoAnterior, $nuevoMuestreo) === 0;
+                $accionMuestreo = $coincide ? 'validado' : 'renombrado';
+
+                DB::transaction(function () use ($itemMuestreo, $usuario, $nuevoMuestreo, $accionMuestreo, $coincide, $capturadoAnterior) {
+                    $itemMuestreo->update([
+                        'archivo_muestreo' => $nuevoMuestreo,
+                        'accion_muestreo'  => $accionMuestreo,
+                        'calidad_user_id'  => $usuario?->id,
+                        'estado'           => 'completado',
+                        'es_correcto'      => $coincide,
+                        'detalles'         => $coincide
+                            ? 'Muestreo de Calidad: Validado (coincide con la captura).'
+                            : "Muestreo de Calidad: Renombrado / Error detectado (Capturista: {$capturadoAnterior} | Calidad: {$nuevoMuestreo}).",
+                        'completado_en'    => now(),
+                    ]);
+
+                    // Si no coincide (renombrado en muestreo), es un error que debe revisarse en auditoria_sellos
+                    if (!$coincide && $itemMuestreo->auditoria_sello_id) {
+                        $selloRow = DB::table('auditoria_sellos')->where('id', $itemMuestreo->auditoria_sello_id)->first();
+                        if ($selloRow) {
+                            $detActual = trim((string) $selloRow->detalles);
+                            $notaMuestreo = "[ERROR EN MUESTREO CALIDAD: Capturista capturó '{$capturadoAnterior}', Calidad capturó '{$nuevoMuestreo}'. Marcado para revisión]";
+                            DB::table('auditoria_sellos')
+                                ->where('id', $itemMuestreo->auditoria_sello_id)
+                                ->update([
+                                    'revisar'           => true,
+                                    'decision_revision' => 'pendiente',
+                                    'detalles'          => trim($detActual . ' ' . $notaMuestreo),
+                                    'updated_at'        => now(),
+                                ]);
+                        }
+                    }
+
+                    // Actualizar contadores y dictamen del ControlMuestreo
+                    $ctrl = $itemMuestreo->controlMuestreo;
+                    if ($ctrl) {
+                        $revisados = ArchivoMuestreo::where('control_muestreo_id', $ctrl->id)
+                            ->where('estado', 'completado')
+                            ->count();
+                        $errores = ArchivoMuestreo::where('control_muestreo_id', $ctrl->id)
+                            ->where('estado', 'completado')
+                            ->where('es_correcto', false)
+                            ->count();
+
+                        $nuevoEstadoCtrl = 'en_proceso';
+                        if ($revisados >= $ctrl->muestra) {
+                            $nuevoEstadoCtrl = ($errores > $ctrl->errores_permitidos) ? 'rechazado' : 'aprobado';
+                        }
+
+                        $ctrl->update([
+                            'revisados'          => $revisados,
+                            'errores_detectados' => $errores,
+                            'estado'             => $nuevoEstadoCtrl,
+                        ]);
+                    }
+                });
+
+                return response()->json([
+                    'ok'          => true,
+                    'modo'        => 'muestreo',
+                    'accion'      => $accionMuestreo,
+                    'es_correcto' => $coincide,
+                    'revisar'     => !$coincide,
+                    'mensaje'     => $coincide
+                        ? 'Muestreo registrado como VALIDADO.'
+                        : 'Discrepancia registrada como RENOMBRADO en muestreo y enviada a revisión.',
+                ]);
+            }
+        }
+
         $asignacion = AsignacionCapturaUsuario::where('user_id', $usuario?->id)->where('activo', true)->first();
 
         // Recuperar la sesión individual activa del archivo (fuente de verdad de ruta_origen, paginas, hash e indice_pdf_id)
@@ -852,13 +1176,53 @@ class CapturaController extends Controller
         $archivoOriginalLimpio = preg_replace('/\.pdf$/i', '', trim($archivoOriginal));
         $archivoNuevoLimpio    = preg_replace('/\.pdf$/i', '', trim($archivoNuevo));
 
-        // Determinar acción exacta
+        // Determinar acción exacta:
+        // Si el nombre original y el nuevo solo varían por la cantidad de ceros a la izquierda en el campo 3 (Libro),
+        // se considera VALIDADO (no renombrado) y se deja constancia en observaciones/detalles.
+        $notaCerosLibro = null;
+        $esIgualPorCerosEnLibro = false;
+        if (strcasecmp($archivoOriginalLimpio, $archivoNuevoLimpio) !== 0) {
+            $pOrig = explode('_', str_replace('-', '_', $archivoOriginalLimpio));
+            $pNuev = explode('_', str_replace('-', '_', $archivoNuevoLimpio));
+            if (
+                count($pOrig) === count($pNuev) &&
+                count($pOrig) >= 9 &&
+                ctype_digit($pOrig[2]) &&
+                ctype_digit($pNuev[2]) &&
+                (int) $pOrig[2] === (int) $pNuev[2]
+            ) {
+                $restoIguales = true;
+                foreach ($pOrig as $idxSeg => $valSeg) {
+                    if ($idxSeg === 2) {
+                        continue;
+                    }
+                    if (strcasecmp($valSeg, $pNuev[$idxSeg]) !== 0) {
+                        $restoIguales = false;
+                        break;
+                    }
+                }
+                if ($restoIguales) {
+                    $esIgualPorCerosEnLibro = true;
+                    $notaCerosLibro = "Validado por diferencia de ceros (0) en el campo Libro ({$pOrig[2]} -> {$pNuev[2]}).";
+                }
+            }
+        }
+
+        $esSelloAgregado = ($modo === 'agregar_sello');
         if ($modo === 'inconsistencia') {
             $accion = 'inconsistencia';
+        } elseif ($modo === 'mover_libros') {
+            $accion = 'mover_libros';
+        } elseif ($modo === 'eliminar') {
+            $accion = 'eliminar';
         } elseif ($modo === 'duplicar') {
             $accion = 'duplicar';
+        } elseif ($esSelloAgregado) {
+            $accion = 'renombrado';
         } else {
-            $accion = strcasecmp($archivoOriginalLimpio, $archivoNuevoLimpio) === 0 ? 'validado' : 'renombrado';
+            $accion = (strcasecmp($archivoOriginalLimpio, $archivoNuevoLimpio) === 0 || $esIgualPorCerosEnLibro)
+                ? 'validado'
+                : 'renombrado';
         }
 
         $delegacionId = $request->input('delegacion_id') ?: $sesionActiva?->delegacion_id ?: $asignacion?->delegacion_id;
@@ -895,37 +1259,75 @@ class CapturaController extends Controller
             }
         }
 
+        if ($accion === 'mover_libros' && $detallesBase === '') {
+            $detallesBase = 'Marcado para mover a Libros (solo registro en BD, sin movimiento físico).';
+        }
+        if ($accion === 'eliminar' && $detallesBase === '') {
+            $detallesBase = 'Marcado como eliminar con autorización (solo registro en BD, sin eliminar archivo físico).';
+        }
+
+        if ($esSelloAgregado && $detallesBase === '') {
+            $detallesBase = 'Sello adicional agregado desde el mismo PDF.';
+        }
+        if ($notaCerosLibro) {
+            $detallesBase = $notaCerosLibro;
+        }
+
         // Verificar existencia en indice_archivos_pdfs (Stellum) para detectar colisión en entregables
         $revisar = false;
         $archivoColisionId = null;
         $rutaColision = null;
         $decisionRevision = null;
+        $motivosRevision = [];
 
-        if ($archivoNuevoLimpio !== '') {
+        if ($archivoNuevoLimpio !== '' && !in_array($accion, ['mover_libros', 'eliminar'], true)) {
             $bridge = app(StellumBridgeService::class);
-            $check = $bridge->verificarExistenciaEnEntregables($archivoNuevoLimpio, $tipoDocumento, $indicePdfId);
+            // Cuando se agrega un sello nuevo ($esSelloAgregado), no excluir el indice_pdf_id actual para verificar toda la tabla indice_archivos_pdfs
+            $idExcluir = $esSelloAgregado ? null : $indicePdfId;
+            $check = $bridge->verificarExistenciaEnEntregables($archivoNuevoLimpio, $tipoDocumento, $idExcluir);
             if (!empty($check['existe']) && !empty($check['coincidencia'])) {
                 $col = $check['coincidencia'];
                 $revisar = true;
                 $archivoColisionId = $col['id'] ?? null;
                 $rutaColision = $col['ruta'] ?? null;
                 $decisionRevision = 'pendiente';
-                $avisoColision = "El archivo ya se encuentra en los entregables (ID: {$archivoColisionId}, Ruta: {$rutaColision}).";
+                $avisoColision = $esSelloAgregado
+                    ? "Enviado a revisión porque al agregar el sello ya existe un PDF con el nombre '{$archivoNuevoLimpio}' en indice_archivos_pdfs (ID: {$archivoColisionId}, Ruta: {$rutaColision})."
+                    : "El archivo ya se encuentra en los entregables (ID: {$archivoColisionId}, Ruta: {$rutaColision}).";
+                $motivosRevision[] = $avisoColision;
                 $detallesBase = trim($detallesBase . ' ' . $avisoColision);
             }
         }
 
-        // Calcular ruta_propuesta conservando la ruta de entregables y ajustando carpeta hasta el año + archivo
-        $rutaPropuesta = RutaPropuestaService::generar($tipoDocumento, [
-            'ruta_origen'           => $rutaOrigen,
-            'delegacion'            => $delegacionNombre,
-            'tipo_sello'            => $tipoSello ?: 'GENERAL',
-            'lote'                  => $lote,
-            'directorio'            => $directorio,
-            'inconsistencia_codigo' => $codigoInconsistencia,
-            'archivo_original'      => $archivoOriginalLimpio,
-            'archivo_nuevo'         => $archivoNuevoLimpio,
-        ], $accion);
+        // Regla de mismo hash / sello agregado: si el PDF pertenece a un grupo con el mismo hash (o es un sello agregado sobre el mismo PDF)
+        // y la sección capturada es > 01, marcar internamente para revisión en BD.
+        if (in_array($accion, ['validado', 'renombrado'], true) && ($hashPdf || $esSelloAgregado)) {
+            $esGrupoMismoHash = $esSelloAgregado
+                || $request->boolean('mismo_hash')
+                || ($hashPdf && ArchivoSesion::where('hash_pdf', $hashPdf)->count() > 1);
+            if ($esGrupoMismoHash) {
+                $partesNombre = explode('_', str_replace('-', '_', $archivoNuevoLimpio ?: $archivoOriginalLimpio));
+                $seccionStr = isset($partesNombre[1]) ? trim($partesNombre[1]) : '';
+                if ($seccionStr !== '' && is_numeric($seccionStr) && (int) $seccionStr > 1) {
+                    $revisar = true;
+                    $decisionRevision = 'pendiente';
+                }
+            }
+        }
+
+        // Calcular ruta_propuesta conservando la ruta de entregables (null si es mover_libros o eliminar)
+        $rutaPropuesta = in_array($accion, ['mover_libros', 'eliminar'], true)
+            ? null
+            : RutaPropuestaService::generar($tipoDocumento, [
+                'ruta_origen'           => $rutaOrigen,
+                'delegacion'            => $delegacionNombre,
+                'tipo_sello'            => $tipoSello ?: 'GENERAL',
+                'lote'                  => $lote,
+                'directorio'            => $directorio,
+                'inconsistencia_codigo' => $codigoInconsistencia,
+                'archivo_original'      => $archivoOriginalLimpio,
+                'archivo_nuevo'         => $archivoNuevoLimpio,
+            ], $accion);
 
         $tabla = match ($tipoDocumento) {
             'sellos'   => 'auditoria_sellos',
@@ -980,8 +1382,10 @@ class CapturaController extends Controller
 
         $auditoriaId = DB::table($tabla)->insertGetId($registro);
 
-        // Cerrar la sesión individual del archivo actual y registrar tiempo real de captura (si no es duplicar)
-        if ($accion !== 'duplicar' && $sesionActiva && $sesionActiva->estado === 'en_captura') {
+        // Cerrar la sesión individual del archivo actual y registrar tiempo real de captura
+        // (si es un sello agregado y aún quedan otros registros pendientes en el mismo PDF, mantener la sesión abierta)
+        $mantenerSesionAbierta = $esSelloAgregado && $request->boolean('quedan_pendientes_en_pdf');
+        if ($accion !== 'duplicar' && !$mantenerSesionAbierta && $sesionActiva && $sesionActiva->estado === 'en_captura') {
             $sesionActiva->update([
                 'estado'          => 'completado',
                 'completado_en'   => now(),
@@ -1011,7 +1415,9 @@ class CapturaController extends Controller
             'solo_bd'                          => true,
             'auditoria_id'                     => $auditoriaId,
             'accion'                           => $accion,
+            'es_sello_agregado'                => $esSelloAgregado,
             'revisar'                          => $revisar,
+            'motivo_revision'                  => $revisar ? implode(' ', $motivosRevision) : null,
             'ruta_origen'                      => $rutaOrigen,
             'ruta_propuesta'                   => $rutaPropuesta,
             'ruta_nueva'                       => $rutaOrigen,
@@ -1019,7 +1425,7 @@ class CapturaController extends Controller
             'fuera_horario_despues_de_guardar' => (bool) ($evalHorario['ultimo_registro_gracia'] ?? false),
             'aviso_horario'                    => ($evalHorario['ultimo_registro_gracia'] ?? false) ? $evalHorario['mensaje'] : null,
             'mensaje'                          => $revisar
-                ? "Registrado en BD ({$accion}). ATENCIÓN: El archivo ya existe en entregables y se marcó para revisión."
+                ? ('Registrado en BD y enviado a revisión: ' . implode(' ', $motivosRevision))
                 : "Acción '{$accion}' registrada únicamente en BD (sin modificar archivo físico).",
         ]);
     }
@@ -1027,6 +1433,11 @@ class CapturaController extends Controller
     public function renombrar(Request $request)
     {
         return $this->registrarAccionSoloBd($request, 'auto');
+    }
+
+    public function agregarSello(Request $request)
+    {
+        return $this->registrarAccionSoloBd($request, 'agregar_sello');
     }
 
     public function validar(Request $request)
@@ -1042,6 +1453,78 @@ class CapturaController extends Controller
     public function inconsistencia(Request $request)
     {
         return $this->registrarAccionSoloBd($request, 'inconsistencia');
+    }
+
+    public function moverLibros(Request $request)
+    {
+        return $this->registrarAccionSoloBd($request, 'mover_libros');
+    }
+
+    public function eliminar(Request $request)
+    {
+        return $this->registrarAccionSoloBd($request, 'eliminar');
+    }
+
+    /**
+     * Pospone ("skipea") el PDF actual previa autorización del supervisor y programa su liberación
+     * exclusivamente para el mismo usuario al día siguiente al inicio de su turno.
+     */
+    public function posponerPdf(Request $request)
+    {
+        $usuario = Auth::user();
+        if (!$usuario) {
+            return response()->json(['ok' => false, 'mensaje' => 'Sesión no válida.'], 401);
+        }
+
+        $sesionIdReq = $request->input('sesion_id') ? (int) $request->input('sesion_id') : null;
+        $sesion = null;
+        if ($sesionIdReq) {
+            $sesion = ArchivoSesion::where('id', $sesionIdReq)
+                ->where('user_id', $usuario->id)
+                ->first();
+        }
+        if (!$sesion) {
+            $sesion = ArchivoSesion::where('user_id', $usuario->id)
+                ->where('estado', 'en_captura')
+                ->latest('id')
+                ->first();
+        }
+
+        if (!$sesion) {
+            return response()->json([
+                'ok'      => false,
+                'mensaje' => 'No se encontró una sesión activa del PDF para posponer.',
+            ], 404);
+        }
+
+        $tz = config('app.timezone', 'America/Mexico_City');
+        $turnoObj = $usuario->turnoRelacion;
+        $nombreTurno = $turnoObj?->nombre ?? ($usuario->turno ?: 'Matutino');
+        $horaInicio = $turnoObj?->hora_inicio ?: '08:00:00';
+        if (strlen($horaInicio) === 5) {
+            $horaInicio .= ':00';
+        }
+
+        $fechaManana = Carbon::now($tz)->addDay()->toDateString();
+        $liberadoAPartirDe = Carbon::parse("{$fechaManana} {$horaInicio}", $tz);
+        $motivo = trim((string) $request->input('motivo', 'Pospuesto con autorización para revisar en el siguiente turno'));
+
+        $sesion->update([
+            'estado'               => 'pospuesto',
+            'user_id'              => $usuario->id,
+            'liberado_a_partir_de' => $liberadoAPartirDe,
+            'turno_pospuesto'      => $nombreTurno,
+            'motivo_pospuesto'     => $motivo,
+            'expira_en'            => null,
+        ]);
+
+        return response()->json([
+            'ok'                   => true,
+            'sesion_id'            => $sesion->id,
+            'liberado_a_partir_de' => $liberadoAPartirDe->format('d/m/Y H:i'),
+            'turno'                => $nombreTurno,
+            'mensaje'              => "PDF pospuesto correctamente. Se liberará de nuevo para ti mañana ({$liberadoAPartirDe->format('d/m/Y H:i')}) en tu turno ({$nombreTurno}).",
+        ]);
     }
 
     /**

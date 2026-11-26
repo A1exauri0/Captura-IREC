@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             DelegacionesSeeder::class,
             MunicipiosSeeder::class,
             LocalidadesSeeder::class,
+            FraccionamientosYColoniasSeeder::class,
             UsersSeeder::class,
         ]);
 

@@ -25,6 +25,45 @@ const CapturaReglas = (() => {
         'INFONAVIT',
     ];
 
+    /**
+     * =========================================================================
+     * CATÁLOGO DE DETECCIÓN AUTOMÁTICA: LIBRO -> FRACCIONAMIENTOS Y COLONIAS
+     * =========================================================================
+     * TODO [CATÁLOGO PENDIENTE]:
+     * Cuando se cuente con el catálogo oficial que relaciona el número de Libro
+     * (o Delegación + Sección + Libro) con "FRACCIONAMIENTOS_Y_COLONIAS" u otro
+     * elemento de CATALOGO_FRACCIONAMIENTO, registrar aquí las equivalencias.
+     *
+     * Ejemplo de estructura soportada:
+     *   '01_01_0045': 'FRACCIONAMIENTOS_Y_COLONIAS', // Por Delegación_Sección_Libro
+     *   '0045':       'FRACCIONAMIENTOS_Y_COLONIAS', // O directamente por número de Libro
+     */
+    const CATALOGO_FRACCIONAMIENTO_POR_LIBRO = {
+        // '0001': 'FRACCIONAMIENTOS_Y_COLONIAS',
+    };
+
+    /**
+     * Detecta automáticamente si un número de Libro corresponde a un Fraccionamiento/Colonia
+     * del catálogo para autoseleccionarlo en la casilla 6 (Fracc.).
+     *
+     * @param {string} libroValor      - Valor capturado en 3. Libro.
+     * @param {string} delegacionClave - Clave de 2 dígitos en 1. Del. (opcional).
+     * @param {string} seccionValor    - Valor en 2. Secc. (opcional).
+     * @returns {string|null} Nombre del fraccionamiento del catálogo o null si no aplica.
+     */
+    function detectarFraccionamientoPorLibro(libroValor, delegacionClave = '', seccionValor = '') {
+        const lib = String(libroValor || '').trim();
+        if (!lib) return null;
+        const claveCompuesta = `${delegacionClave}_${seccionValor}_${lib}`;
+        if (CATALOGO_FRACCIONAMIENTO_POR_LIBRO[claveCompuesta]) {
+            return CATALOGO_FRACCIONAMIENTO_POR_LIBRO[claveCompuesta];
+        }
+        if (CATALOGO_FRACCIONAMIENTO_POR_LIBRO[lib]) {
+            return CATALOGO_FRACCIONAMIENTO_POR_LIBRO[lib];
+        }
+        return null;
+    }
+
     function extraerTextoBaseTomo(tomoStr) {
         if (!tomoStr) return '';
         const match = String(tomoStr).match(/^\d+_(.+)$/);
@@ -60,58 +99,77 @@ const CapturaReglas = (() => {
         const partes = nombre.split('_');
         const total = partes.length;
 
-        // --- REGLA 2 (Sellos) — ServicioReglas.vb ---
+        // --- REGLA 2 (Sellos) — ServicioReglas.vb + reglas dinámicas de dígitos ---
         if (esRegla2 || !esRegla1) {
             if (total < 9) {
                 return { valido: false, mensaje: 'Deben ser al menos 9 bloques separados por guion bajo' };
             }
 
-            // Bloque 1 (Delegación): 2 dígitos
-            if (!/^\d{2}$/.test(partes[0])) {
-                return { valido: false, mensaje: 'Bloque 1 (Delegación) debe ser de 2 dígitos' };
+            const cfg = (typeof window !== 'undefined' && window.REGLAS_DIGITOS_SELLOS) ? window.REGLAS_DIGITOS_SELLOS : {};
+            const rDel   = cfg.delegacion      || { min: 2, max: 2 };
+            const rSecc  = cfg.seccion         || { min: 2, max: 3 };
+            const rLibro = cfg.libro           || { min: 2, max: 6 };
+            const rTomo  = cfg.tomo            || { min: 1, max: 30 };
+            const rVol   = cfg.volumen         || { min: 2, max: 3 };
+            const rFracc = cfg.fraccionamiento || { min: 1, max: 55 };
+            const rAnio  = cfg.anio            || { min: 4, max: 4 };
+            const rInscr = cfg.inscripcion     || { min: 4, max: 4 };
+            const rBis   = cfg.bis             || { min: 2, max: 2 };
+
+            const reDel   = new RegExp(`^\\d{${rDel.min},${rDel.max}}$`);
+            const reSecc  = new RegExp(`^\\d{${rSecc.min},${rSecc.max}}$`);
+            const reLibro = new RegExp(`^\\d{${rLibro.min},${rLibro.max}}$`);
+            const reVol   = new RegExp(`^\\d{${rVol.min},${rVol.max}}$`);
+            const reAnio  = new RegExp(`^\\d{${rAnio.min},${rAnio.max}}$`);
+            const reInscr = new RegExp(`^\\d{${rInscr.min},${rInscr.max}}$`);
+            const reBis   = new RegExp(`^(\\d{${rBis.min},${rBis.max}}|BIS)$`);
+
+            // Bloque 1 (Delegación)
+            if (!reDel.test(partes[0])) {
+                return { valido: false, mensaje: `Bloque 1 (Delegación) debe ser de ${rDel.min === rDel.max ? rDel.min : (rDel.min + ' a ' + rDel.max)} dígitos` };
             }
             if (delegClave && partes[0] !== delegClave) {
                 return { valido: false, mensaje: `Bloque 1 debe coincidir con la delegación (${delegClave} - ${delegNombre || ''})` };
             }
 
-            // Bloque 2 (Sección): 2 a 3 dígitos
-            if (!/^\d{2,3}$/.test(partes[1])) {
-                return { valido: false, mensaje: 'Bloque 2 (Sección) debe ser de 2 a 3 dígitos' };
+            // Bloque 2 (Sección)
+            if (!reSecc.test(partes[1])) {
+                return { valido: false, mensaje: `Bloque 2 (Sección) debe ser de ${rSecc.min === rSecc.max ? rSecc.min : (rSecc.min + ' a ' + rSecc.max)} dígitos` };
             }
 
-            // Bloque 3 (Libro): 2 a 6 dígitos
-            if (!/^\d{2,6}$/.test(partes[2])) {
-                return { valido: false, mensaje: 'Bloque 3 (Libro) debe ser de 2 a 6 dígitos' };
+            // Bloque 3 (Libro)
+            if (!reLibro.test(partes[2])) {
+                return { valido: false, mensaje: `Bloque 3 (Libro) debe ser de ${rLibro.min === rLibro.max ? rLibro.min : (rLibro.min + ' a ' + rLibro.max)} dígitos` };
             }
 
-            // Bloque 9 (BIS, último): 2 dígitos o "BIS"
-            if (!/^(\d{2}|BIS)$/.test(partes[total - 1])) {
-                return { valido: false, mensaje: "Bloque 9 (BIS) debe ser de 2 dígitos o la palabra 'BIS'" };
+            // Bloque 9 (BIS, último)
+            if (!reBis.test(partes[total - 1])) {
+                return { valido: false, mensaje: "Bloque 9 (BIS) debe ser numérico o la palabra 'BIS'" };
             }
 
-            // Bloque 8 (Inscripción, penúltimo): exactamente 4 dígitos
-            if (!/^\d{4}$/.test(partes[total - 2])) {
-                return { valido: false, mensaje: 'Bloque 8 (Inscripción) debe ser de 4 dígitos rellenado con ceros' };
+            // Bloque 8 (Inscripción, penúltimo)
+            if (!reInscr.test(partes[total - 2])) {
+                return { valido: false, mensaje: `Bloque 8 (Inscripción) debe ser de ${rInscr.min === rInscr.max ? rInscr.min : (rInscr.min + ' a ' + rInscr.max)} dígitos rellenado con ceros` };
             }
 
-            // Bloque 7 (Año, antepenúltimo): 4 dígitos + catálogo de años (1850-2030)
+            // Bloque 7 (Año, antepenúltimo)
             const anio = partes[total - 3];
-            if (!/^\d{4}$/.test(anio)) {
-                return { valido: false, mensaje: 'Bloque 7 (Año) debe ser de 4 dígitos' };
+            if (!reAnio.test(anio)) {
+                return { valido: false, mensaje: `Bloque 7 (Año) debe ser de ${rAnio.min} dígitos` };
             }
             if (Array.isArray(catalogoAnios) && catalogoAnios.length > 0 && !catalogoAnios.includes(anio)) {
                 return { valido: false, mensaje: `El año ${anio} no es válido.` };
             }
 
-            // Ubicar Volumen (bloque 5: 2 a 3 dígitos), Tomo (bloque 4: 1-30 chars) y Fraccionamiento (bloque 6: 1-55 chars)
+            // Ubicar Volumen (bloque 5), Tomo (bloque 4) y Fraccionamiento (bloque 6)
             let idxVol = -1;
             let tomoStr = '';
             let fracStr = '';
             for (let i = 4; i <= total - 5; i++) {
-                if (/^\d{2,3}$/.test(partes[i])) {
+                if (reVol.test(partes[i])) {
                     const tempTomo = partes.slice(3, i).join('_');
                     const tempFrac = partes.slice(i + 1, total - 3).join('_');
-                    if (tempTomo.length >= 1 && tempTomo.length <= 30 && tempFrac.length >= 1 && tempFrac.length <= 55) {
+                    if (tempTomo.length >= rTomo.min && tempTomo.length <= rTomo.max && tempFrac.length >= rFracc.min && tempFrac.length <= rFracc.max) {
                         idxVol = i;
                         tomoStr = tempTomo;
                         fracStr = tempFrac;
@@ -178,6 +236,8 @@ const CapturaReglas = (() => {
     return {
         CATALOGO_TOMOS,
         CATALOGO_FRACCIONAMIENTO,
+        CATALOGO_FRACCIONAMIENTO_POR_LIBRO,
+        detectarFraccionamientoPorLibro,
         extraerTextoBaseTomo,
         sanitizarTexto,
         validarNombre,

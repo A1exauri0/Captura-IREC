@@ -46,6 +46,7 @@
                 "label": "Supervisión",
                 "icon": "fa-solid fa-list-check",
                 "children": [
+                    { "label": "Gestión de Muestreo", "icon": "fa-solid fa-vial-circle-check", "route": "admin.muestreo.index" },
                     { "label": "Inconsistencias", "icon": "fa-solid fa-triangle-exclamation", "route": "admin.inconsistencias.index" },
                     { "label": "Archivos por revisar", "icon": "fa-solid fa-code-compare", "route": "admin.colisiones.index" },
                     { "label": "Aprobación de Renombres", "icon": "fa-solid fa-check-double", "route": "admin.aprobacion.index" }
@@ -56,15 +57,13 @@
     {
         "section": "Analíticas & Bitácora",
         "items": [
+            /* Submenús con 1 sola opción comentados para dejarlos como botones directos:
             {
                 "id": "submenu-indicadores",
                 "label": "Indicadores KPI",
                 "icon": "fa-solid fa-chart-pie",
                 "children": [
-                    /* { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.index" }, */
                     { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.index" }
-                    /* ,{ "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.capturas" },
-                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.index" } */
                 ]
             },
             {
@@ -72,10 +71,7 @@
                 "label": "Productividad",
                 "icon": "fa-solid fa-users-line",
                 "children": [
-                    /* { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.usuarios" }, */
                     { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.usuarios" }
-                    /* ,{ "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.reportes_capturas_notarias" },
-                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.usuarios" } */
                 ]
             },
             {
@@ -83,11 +79,27 @@
                 "label": "Bitácoras",
                 "icon": "fa-solid fa-clock-rotate-left",
                 "children": [
-                    /* { "label": "Registros", "icon": "fa-solid fa-file-signature", "route": "admin.analytics_capturas.reportes.detalles_renombre" }, */
                     { "label": "Sellos", "icon": "fa-solid fa-stamp", "route": "admin.analytics_sellos.reportes.detalles_renombre" }
-                    /* ,{ "label": "Notarías", "icon": "fa-solid fa-landmark", "route": "admin.analytics_digitalizacion.reportes.detalles_renombre" },
-                    { "label": "Catastro", "icon": "fa-solid fa-map-location-dot", "route": "admin.analytics_catastro.reportes.detalles_renombre" } */
                 ]
+            }
+            */
+            {
+                "label": "Indicadores KPI",
+                "icon": "fa-solid fa-chart-pie",
+                "route": "admin.analytics_sellos.reportes.index",
+                "active_routes": ["admin.analytics_sellos.reportes.index"]
+            },
+            {
+                "label": "Productividad",
+                "icon": "fa-solid fa-users-line",
+                "route": "admin.analytics_sellos.reportes.usuarios",
+                "active_routes": ["admin.analytics_sellos.reportes.usuarios"]
+            },
+            {
+                "label": "Bitácoras",
+                "icon": "fa-solid fa-clock-rotate-left",
+                "route": "admin.analytics_sellos.reportes.detalles_renombre",
+                "active_routes": ["admin.analytics_sellos.reportes.detalles_renombre"]
             }
         ]
     },
