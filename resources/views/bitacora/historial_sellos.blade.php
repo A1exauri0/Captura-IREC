@@ -409,8 +409,7 @@
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
+    <!-- jQuery ya cargado en layouts.app (evitar sobrescribir plugins de Bootstrap) -->
     <script>
         $(document).ready(function () {
             const fechaInicioInput = document.getElementById('fechaInicio');

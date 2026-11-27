@@ -133,6 +133,17 @@
             font-weight: 600;
             transition: all 0.15s ease;
         }
+        /* Compatibilidad Bootstrap 4 collapse con TailwindCSS v4 (.collapse { visibility: collapse }) */
+        .collapse {
+            visibility: visible !important;
+        }
+        .collapse:not(.show) {
+            display: none !important;
+        }
+        .collapse.show {
+            display: block !important;
+            visibility: visible !important;
+        }
         @media (max-width: 991px) {
             #app-sidebar {
                 transform: translateX(-100%);
