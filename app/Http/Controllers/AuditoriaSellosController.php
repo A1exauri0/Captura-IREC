@@ -1861,7 +1861,7 @@ class AuditoriaSellosController extends Controller
                         $sub->whereNull('u.id')
                             ->orWhere(function ($s2) {
                                 $s2->where('u.id', '<>', 1)
-                                    ->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
+                                    ->whereRaw("LOWER(u.user) NOT IN ('admin', 'administrador')")
                                     ->where('u.name', 'not like', '%Administrador%');
                             });
                     });
@@ -1873,20 +1873,20 @@ class AuditoriaSellosController extends Controller
             ->get();
 
         // Consulta SQL para obtener la fecha laboral considerando cortes de fin de semana y turnos de día
-        $fechaLaboralSql = 'CASE 
+        $fechaLaboralSql = "CASE 
             WHEN (ac.turno IS NOT NULL AND (
-                LOWER(ac.turno) LIKE "%matutino%" OR 
-                LOWER(ac.turno) LIKE "%vespertino%" OR 
-                LOWER(ac.turno) LIKE "%mixto%" OR 
-                LOWER(ac.turno) LIKE "%calidad%" OR 
-                LOWER(ac.turno) LIKE "%sabado%" OR 
-                LOWER(ac.turno) LIKE "%sábado%" OR 
-                LOWER(ac.turno) LIKE "%domingo%"
+                LOWER(ac.turno) LIKE '%matutino%' OR 
+                LOWER(ac.turno) LIKE '%vespertino%' OR 
+                LOWER(ac.turno) LIKE '%mixto%' OR 
+                LOWER(ac.turno) LIKE '%calidad%' OR 
+                LOWER(ac.turno) LIKE '%sabado%' OR 
+                LOWER(ac.turno) LIKE '%sábado%' OR 
+                LOWER(ac.turno) LIKE '%domingo%'
             )) THEN DATE(ac.fecha_hora)
             WHEN (WEEKDAY(ac.fecha_hora) IN (5, 6) AND HOUR(ac.fecha_hora) < 9) THEN DATE(DATE_SUB(ac.fecha_hora, INTERVAL 1 DAY))
             WHEN HOUR(ac.fecha_hora) < 9 THEN DATE(DATE_SUB(ac.fecha_hora, INTERVAL 1 DAY))
             ELSE DATE(ac.fecha_hora)
-        END';
+        END";
 
         $query = DB::table('auditoria_sellos as ac')
             ->leftJoin('users as u', 'u.id', '=', 'ac.user_id')
@@ -1897,7 +1897,7 @@ class AuditoriaSellosController extends Controller
                 'ac.fecha_hora as FechaHora',
                 'u.user as Usuario',
                 'u.name as NombreCompleto',
-                DB::raw('COALESCE(NULLIF(ac.turno, ""), NULLIF(u.turno, ""), "Matutino") as Turno'),
+                DB::raw("COALESCE(NULLIF(ac.turno, ''), NULLIF(u.turno, ''), 'Matutino') as Turno"),
                 'ac.accion as Accion',
                 'ac.archivo_original as ArchivoOriginal',
                 'ac.archivo_nuevo as ArchivoNuevo',
@@ -1912,7 +1912,7 @@ class AuditoriaSellosController extends Controller
                     ->orWhere(function ($sub) {
                         $sub->where('ac.user_id', '<>', 1)
                             ->where('u.id', '<>', 1)
-                            ->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
+                            ->whereRaw("LOWER(u.user) NOT IN ('admin', 'administrador')")
                             ->where('u.name', 'not like', '%Administrador%');
                     });
             });
@@ -1988,7 +1988,8 @@ class AuditoriaSellosController extends Controller
                 ->leftJoin('users as u', 'u.id', '=', 'ac.user_id')
                 ->select(
                     DB::raw("DISTINCT {$fechaLaboralSql} as FechaLaboral"),
-                    DB::raw("({$normalizarTurnoSql}) as TurnoGrupo")
+                    DB::raw("({$normalizarTurnoSql}) as TurnoGrupo"),
+                    DB::raw("({$prioTurnoSql}) as PrioTurno")
                 );
 
             // Excluir administradores salvo que se active ver_admin
@@ -1998,7 +1999,7 @@ class AuditoriaSellosController extends Controller
                         ->orWhere(function ($sub) {
                             $sub->where('ac.user_id', '<>', 1)
                                 ->where('u.id', '<>', 1)
-                                ->whereRaw('LOWER(u.user) NOT IN ("admin", "administrador")')
+                                ->whereRaw("LOWER(u.user) NOT IN ('admin', 'administrador')")
                                 ->where('u.name', 'not like', '%Administrador%');
                         });
                 });
@@ -2043,11 +2044,13 @@ class AuditoriaSellosController extends Controller
                 $queryFechas->where('ac.tipo_sello', $tipoSello);
             }
 
-            // Ordenar por FechaLaboral desc, y luego por prioridad de turno (Nocturno, Vespertino, Matutino)
-            $queryFechas->orderBy('FechaLaboral', 'desc')
-                ->orderBy(DB::raw($prioTurnoSql), 'asc');
-
-            $fechasPaginadas = $queryFechas->paginate(1)->appends(request()->query());
+            // Ordenar sobre subconsulta para compatibilidad con MySQL 8 (ONLY_FULL_GROUP_BY + DISTINCT) y conteo exacto de páginas
+            $fechasPaginadas = DB::query()
+                ->fromSub($queryFechas, 'fechas_turnos')
+                ->orderBy('FechaLaboral', 'desc')
+                ->orderBy('PrioTurno', 'asc')
+                ->paginate(1)
+                ->appends(request()->query());
             $itemActual = collect($fechasPaginadas->items())->first();
 
             if ($itemActual) {

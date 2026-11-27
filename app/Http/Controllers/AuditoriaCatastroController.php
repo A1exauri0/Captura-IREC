@@ -1679,7 +1679,8 @@ class AuditoriaCatastroController extends Controller
                 ->leftJoin('users as u', 'u.id', '=', 'ac.user_id')
                 ->select(
                     DB::raw("DISTINCT {$fechaLaboralSql} as FechaLaboral"),
-                    DB::raw("({$normalizarTurnoSql}) as TurnoGrupo")
+                    DB::raw("({$normalizarTurnoSql}) as TurnoGrupo"),
+                    DB::raw("({$prioTurnoSql}) as PrioTurno")
                 );
 
             $queryFechas->where(function ($q) {
@@ -1709,10 +1710,12 @@ class AuditoriaCatastroController extends Controller
                 $queryFechas->where('ac.tipo', $tipoCatastro);
             }
 
-            $queryFechas->orderBy('FechaLaboral', 'desc')
-                ->orderBy(DB::raw($prioTurnoSql), 'asc');
-
-            $fechasPaginadas = $queryFechas->paginate(1)->appends(request()->query());
+            $fechasPaginadas = DB::query()
+                ->fromSub($queryFechas, 'fechas_turnos')
+                ->orderBy('FechaLaboral', 'desc')
+                ->orderBy('PrioTurno', 'asc')
+                ->paginate(1)
+                ->appends(request()->query());
             $itemActual = collect($fechasPaginadas->items())->first();
 
             if ($itemActual) {
