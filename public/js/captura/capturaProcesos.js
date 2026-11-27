@@ -326,11 +326,25 @@ const CapturaProcesos = (() => {
                 barra.classList.remove("hidden");
             }
             cont.innerHTML = "";
+            cont.classList.remove("max-h-24", "overflow-y-auto", "pr-1");
+            cont.style.maxHeight = "";
+            cont.style.overflowY = "";
             return;
         }
 
         barra.classList.remove("hidden");
         cont.innerHTML = "";
+
+        // Si hay más de 20 PDFs en el grupo, activar scroll vertical compacto para no tapar la pantalla
+        if (ctx.listaPdfs.length > 20) {
+            cont.classList.add("max-h-24", "overflow-y-auto", "pr-1");
+            cont.style.maxHeight = "6rem";
+            cont.style.overflowY = "auto";
+        } else {
+            cont.classList.remove("max-h-24", "overflow-y-auto", "pr-1");
+            cont.style.maxHeight = "";
+            cont.style.overflowY = "";
+        }
 
         const indicesDif = detectarIndicesDiferentesGrupoHash(ctx.listaPdfs);
 
@@ -1553,6 +1567,9 @@ const CapturaProcesos = (() => {
             if (!resp || !resp.ok) {
                 throw new Error((resp && resp.mensaje) || 'No se pudo posponer el PDF.');
             }
+            // Pasar al SIGUIENTE PDF físico completo (no al siguiente sello del mismo PDF)
+            ctx.listaPdfs = [];
+            ctx.indiceActual = 0;
             reiniciarCaptura(ctx);
             avanzarSiguiente(ctx);
         } catch (err) {

@@ -205,19 +205,19 @@
                 </div>
             </div>
 
-            <!-- FILA 2: Barra de Sellos del PDF actual (Agregar Sello siempre visible + badges de PDFs con el mismo hash) -->
+            <!-- FILA 2: Barra de Sellos del PDF actual (Agregar Sello siempre visible + badges con scroll si son > 20) -->
             @if(($modoOperacion ?? 'captura') !== 'muestreo')
-                <div id="barraGrupoHash" class="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-900/70 border border-gray-300 dark:border-gray-700 text-xs">
+                <div id="barraGrupoHash" class="flex items-start gap-2 px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-900/70 border border-gray-300 dark:border-gray-700 text-xs">
                     <button id="btnAgregarSello" type="button"
-                        class="px-2.5 py-1 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                        class="px-2.5 py-1 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md shadow-sm transition-colors flex items-center gap-1 shrink-0 self-start"
                         title="Agregar un sello adicional sobre el mismo PDF actual (verifica en indice_archivos_pdfs si ya existe)">
                         <i class="fa-solid fa-plus-circle"></i> Agregar Sello
                     </button>
-                    <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5"></div>
+                    <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0"></div>
                 </div>
             @else
-                <div id="barraGrupoHash" class="hidden flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-900/70 border border-gray-300 dark:border-gray-700 text-xs">
-                    <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5"></div>
+                <div id="barraGrupoHash" class="hidden flex items-start gap-2 px-3 py-1.5 rounded-lg bg-slate-200/70 dark:bg-slate-900/70 border border-gray-300 dark:border-gray-700 text-xs">
+                    <div id="contenedorBotonesHash" class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0"></div>
                 </div>
             @endif
 

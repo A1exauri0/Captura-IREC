@@ -430,7 +430,15 @@ class CapturaController extends Controller
                 ->first();
 
             if ($pospuestoListo) {
-                $pospuestoListo->update([
+                $hashPospuesto = trim((string) $pospuestoListo->hash_pdf);
+                $queryReactivar = ArchivoSesion::where('user_id', $userId)
+                    ->where('estado', 'pospuesto');
+                if ($hashPospuesto !== '') {
+                    $queryReactivar->where('hash_pdf', $hashPospuesto);
+                } else {
+                    $queryReactivar->where('id', $pospuestoListo->id);
+                }
+                $queryReactivar->update([
                     'estado'               => 'en_captura',
                     'tomado_en'            => now(),
                     'expira_en'            => now()->addMinutes(15),
@@ -1530,7 +1538,17 @@ class CapturaController extends Controller
         $liberadoAPartirDe = Carbon::parse("{$fechaManana} {$horaInicio}", $tz);
         $motivo = trim((string) $request->input('motivo', 'Pospuesto con autorización para revisar en el siguiente turno'));
 
-        $sesion->update([
+        // Posponer el PDF físico completo (si tiene varios registros con el mismo hash en sesión, posponer todos)
+        $hashPdfActual = trim((string) $sesion->hash_pdf);
+        $queryPosponer = ArchivoSesion::where('user_id', $usuario->id)
+            ->where('estado', 'en_captura');
+        if ($hashPdfActual !== '') {
+            $queryPosponer->where('hash_pdf', $hashPdfActual);
+        } else {
+            $queryPosponer->where('id', $sesion->id);
+        }
+
+        $totalPospuestos = $queryPosponer->update([
             'estado'               => 'pospuesto',
             'user_id'              => $usuario->id,
             'liberado_a_partir_de' => $liberadoAPartirDe,
@@ -1542,9 +1560,10 @@ class CapturaController extends Controller
         return response()->json([
             'ok'                   => true,
             'sesion_id'            => $sesion->id,
+            'total_pospuestos'     => $totalPospuestos,
             'liberado_a_partir_de' => $liberadoAPartirDe->format('d/m/Y H:i'),
             'turno'                => $nombreTurno,
-            'mensaje'              => "PDF pospuesto correctamente. Se liberará de nuevo para ti mañana ({$liberadoAPartirDe->format('d/m/Y H:i')}) en tu turno ({$nombreTurno}).",
+            'mensaje'              => "PDF pospuesto correctamente ({$totalPospuestos} registro(s)). Se liberará de nuevo para ti mañana ({$liberadoAPartirDe->format('d/m/Y H:i')}) en tu turno ({$nombreTurno}).",
         ]);
     }
 
