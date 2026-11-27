@@ -1500,6 +1500,12 @@
                 if (!menuSelloDel) return;
                 const claveActual = (inputDel?.value || '').trim();
                 menuSelloDel.innerHTML = '';
+
+                const header = document.createElement('div');
+                header.className = 'px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700 flex justify-between';
+                header.innerHTML = `<span>Catálogo Delegaciones</span><span>${ctx.delegacionDesbloqueada ? 'Desbloqueado' : 'Cambiar requiere aut.'}</span>`;
+                menuSelloDel.appendChild(header);
+
                 CATALOGO_DELEGACIONES.forEach((d) => {
                     const clave = String(d.clave ?? d.id ?? '').padStart(2, '0');
                     const activo = clave === claveActual;
@@ -1510,11 +1516,29 @@
                             ? 'bg-sky-600 text-white'
                             : 'text-gray-800 dark:text-gray-100 hover:bg-sky-50 dark:hover:bg-gray-700');
                     btn.innerHTML = `<span>${clave} - ${d.nombre}</span>${activo ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}`;
-                    btn.addEventListener('mousedown', (e) => {
+                    btn.addEventListener('mousedown', async (e) => {
                         e.preventDefault();
+                        e.stopPropagation();
+                        cerrarMenuDelegaciones();
+
+                        // Si seleccionó la misma delegación actual, no pedir autorización
+                        if (clave === claveActual) {
+                            campos[1]?.focus();
+                            return;
+                        }
+
+                        // Si elige una delegación distinta y aún no está autorizada para este PDF, pedir autorización
+                        if (!ctx.delegacionDesbloqueada) {
+                            const autorizado = await solicitarPinMaestro(
+                                'Cambio de delegación',
+                                `Autorizar cambio de delegación (${claveActual || '--'} -> ${clave} - ${d.nombre})`
+                            );
+                            if (!autorizado) return;
+                            establecerBloqueoDelegacion(true);
+                        }
+
                         inputDel.value = clave;
                         ctx.delSeleccionada = { id: d.id, clave, nombre: d.nombre };
-                        cerrarMenuDelegaciones();
                         construirNombreSellos();
                         campos[1]?.focus();
                     });
@@ -1573,27 +1597,22 @@
                 setTimeout(cerrarMenuDelegaciones, 120);
             });
 
-            btnCambiarDelegacion?.addEventListener('click', async (e) => {
+            function toggleMenuDelegaciones(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (ctx.delegacionDesbloqueada) {
-                    if (menuSelloDel && !menuSelloDel.classList.contains('hidden')) {
-                        cerrarMenuDelegaciones();
-                    } else {
-                        renderMenuDelegaciones();
-                        inputDel?.focus();
-                    }
-                    return;
-                }
-                const autorizado = await solicitarPinMaestro(
-                    'Cambio de delegación',
-                    'Autorizar cambio de delegación en estación de captura'
-                );
-                if (autorizado) {
-                    establecerBloqueoDelegacion(true);
+                if (menuSelloDel && !menuSelloDel.classList.contains('hidden')) {
+                    cerrarMenuDelegaciones();
+                } else {
                     renderMenuDelegaciones();
-                    inputDel?.focus();
-                    inputDel?.select();
+                }
+            }
+
+            // Permitir ver siempre el catálogo de delegaciones sin autorización (desde el botón o haciendo clic en 1. Del.)
+            btnCambiarDelegacion?.addEventListener('click', toggleMenuDelegaciones);
+            inputDel?.addEventListener('click', toggleMenuDelegaciones);
+            document.addEventListener('click', (e) => {
+                if (menuSelloDel && !menuSelloDel.contains(e.target) && e.target !== btnCambiarDelegacion && e.target !== inputDel) {
+                    cerrarMenuDelegaciones();
                 }
             });
 
