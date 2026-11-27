@@ -296,7 +296,7 @@
                                                                 </span>
                                                             </td>
                                                             <td class="py-3 px-3 text-center" style="width: 8%;">
-                                                                @if(!empty($reg->Ruta))
+                                                                @if(!empty($reg->Ruta) || !empty($reg->IndicePdfId))
                                                                     <div class="d-flex align-items-center justify-content-center" style="gap: 8px;">
                                                                         <a href="{{ route('admin.analytics_sellos.reportes.ver_pdf', $reg->Id) }}" target="_blank" class="text-danger" title="Ver PDF" style="font-size: 1.45rem; display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">
                                                                             <i class="mdi mdi-file-pdf-box"></i>
@@ -493,14 +493,22 @@
                 });
             }
 
-            // Mover el modal al final de la página para evitar cortes y asegurar prioridad de renderizado
+            // Mover el modal al final de la página sin abrirlo automáticamente y evitar advertencia aria-hidden al cerrar
             try {
-                $('body').append($('#modalEditarRenombre'));
-                
-                // Inicializar modal de Materialize CSS (con control de errores si no existe el metodo)
-                if (typeof $.fn.modal === 'function') {
-                    $('#modalEditarRenombre').modal();
-                }
+                const $modalEditar = $('#modalEditarRenombre');
+                $('body').append($modalEditar);
+
+                $modalEditar.on('hide.bs.modal', function () {
+                    if (document.activeElement && this.contains(document.activeElement)) {
+                        document.activeElement.blur();
+                    }
+                });
+
+                $(document).on('click', '#modalEditarRenombre .modal-close', function () {
+                    if (document.activeElement) document.activeElement.blur();
+                    $('#iframePdfEditar').attr('src', '');
+                    $modalEditar.modal('hide');
+                });
             } catch (e) {
                 console.error("Error al inicializar modal:", e);
             }
@@ -594,7 +602,7 @@
                 });
 
                 actualizarVistaPrevia();
-                $('#modalEditarRenombre').modal('open');
+                $('#modalEditarRenombre').modal('show');
             });
 
             function actualizarVistaPrevia() {
@@ -637,7 +645,8 @@
                         btn.prop('disabled', false).html('<i class="mdi mdi-content-save mr-1"></i>Guardar Cambios');
                         if (response.ok) {
                             alert(response.mensaje);
-                            $('#modalEditarRenombre').modal('close');
+                            if (document.activeElement) document.activeElement.blur();
+                            $('#modalEditarRenombre').modal('hide');
                             window.location.reload();
                         } else {
                             alert('Error: ' + response.mensaje);

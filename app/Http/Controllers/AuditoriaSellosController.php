@@ -965,7 +965,9 @@ class AuditoriaSellosController extends Controller
             ->leftJoin('delegaciones as d', 'd.id', '=', 'ac.delegacion_id')
             ->select(
                 'ac.id as Id',
+                'ac.indice_pdf_id as IndicePdfId',
                 'ac.ruta as Ruta',
+                'ac.ruta_origen as RutaOrigen',
                 'ac.fecha_hora as FechaHora',
                 'u.user as Usuario',
                 'u.name as NombreCompleto',
@@ -1893,7 +1895,9 @@ class AuditoriaSellosController extends Controller
             ->leftJoin('delegaciones as d', 'd.id', '=', 'ac.delegacion_id')
             ->select(
                 'ac.id as Id',
+                'ac.indice_pdf_id as IndicePdfId',
                 'ac.ruta as Ruta',
+                'ac.ruta_origen as RutaOrigen',
                 'ac.fecha_hora as FechaHora',
                 'u.user as Usuario',
                 'u.name as NombreCompleto',
@@ -2140,16 +2144,46 @@ class AuditoriaSellosController extends Controller
     public function ver_pdf($id)
     {
         $registro = \App\Models\AuditoriaSellos::findOrFail($id);
-        $ruta = $registro->ruta;
 
-        if (empty($ruta) || !file_exists($ruta)) {
-            return abort(404, 'El archivo PDF no existe en la ruta física: ' . $ruta);
+        // 1. Si proviene de indice_archivos_pdfs (Stellum), servir desde el caché local SSD / Stellum Bridge
+        $indicePdfId = (int) ($registro->indice_pdf_id ?? 0);
+        if ($indicePdfId > 0) {
+            $cache = app(\App\Services\PdfCacheService::class);
+            $res = $cache->asegurarEnCache($indicePdfId, 95);
+            if (!empty($res['ok']) && !empty($res['path']) && is_file($res['path'])) {
+                $nombreDescarga = ($registro->archivo_nuevo ?: $registro->archivo_original ?: ('documento_' . $indicePdfId));
+                if (!str_ends_with(strtolower($nombreDescarga), '.pdf')) {
+                    $nombreDescarga .= '.pdf';
+                }
+                $headers = [
+                    'Content-Type'        => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="' . basename($nombreDescarga) . '"',
+                    'Cache-Control'       => 'private, max-age=300',
+                ];
+                if (config('services.stellum_bridge.pdf_cache_xaccel', false)) {
+                    $headers['X-Accel-Redirect'] = '/_internal_pdf_cache/' . $indicePdfId . '.pdf';
+                    return response('', 200, $headers);
+                }
+                return response()->file($res['path'], $headers);
+            }
         }
 
-        return response()->file($ruta, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . basename($ruta) . '"'
+        // 2. Respaldo para rutas físicas locales (ruta_origen / ruta_destino / ruta)
+        $candidatas = array_filter([
+            $registro->ruta_origen ?? null,
+            $registro->ruta_destino ?? null,
+            $registro->ruta ?? null,
         ]);
+        foreach ($candidatas as $rutaFisica) {
+            if (!empty($rutaFisica) && is_file($rutaFisica) && is_readable($rutaFisica)) {
+                return response()->file($rutaFisica, [
+                    'Content-Type'        => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="' . basename($rutaFisica) . '"',
+                ]);
+            }
+        }
+
+        return abort(404, 'El archivo PDF no se encontró en Stellum ni en la ruta física: ' . ($registro->ruta_origen ?: $registro->ruta));
     }
 
     public function editar_renombre(Request $request)
