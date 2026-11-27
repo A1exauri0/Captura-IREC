@@ -1001,11 +1001,7 @@
         // document.getElementById('btnDuplicar')?.addEventListener('click', () => CapturaProcesos.procesarDuplicar(ctx));
         document.getElementById('btnLimpiar')?.addEventListener('click', () => CapturaProcesos.reiniciarCaptura(ctx));
         document.getElementById('btnRefrescar')?.addEventListener('click', () => {
-            if (ctx.listaPdfs && ctx.listaPdfs.length > 0 && ctx.indiceActual >= 0) {
-                CapturaProcesos.cargarPdfActual(ctx);
-            } else {
-                CapturaProcesos.cargarLoteDesdeServidor(ctx);
-            }
+            window.location.reload();
         });
         document.getElementById('btnCerrarSesion')?.addEventListener('click', () => CapturaProcesos.cerrarSesion(ctx));
 
